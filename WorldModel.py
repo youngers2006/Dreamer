@@ -14,7 +14,7 @@ class WorldModel(nn.Module):
     
     def forward(self, observation, last_hidden):
         latent_state = self.encoder(observation)
-        hidden_state = self.GRU(last_hidden)
+        _, hidden_state = self.GRU(last_hidden)
         state = torch.cat(hidden_state, latent_state, dim=-1)
         return state, hidden_state
     
