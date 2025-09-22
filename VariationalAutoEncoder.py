@@ -46,4 +46,3 @@ class Decoder(nn.Module):
     def forward(self, x):
         x = self.upscaler(x)
         return self.image_builder(x)
-
