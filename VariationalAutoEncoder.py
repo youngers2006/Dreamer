@@ -3,6 +3,9 @@ import torch.nn as nn
 
 class Encoder(nn.Module):
     def __init__(self, num_filters_1, num_filters_2, latent_size, device='cpu'):
+        """
+        Takes obseravtion (usually image) and maps it to a latent state representation through a CNN.
+        """
         super().__init__()
         self.feature_extractor = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=num_filters_1, kernel_size=3, stride=1, padding=1, device=device),
@@ -23,6 +26,9 @@ class Encoder(nn.Module):
         return self.latent_mapper(x)
 
 class Decoder(nn.Module):
+    """
+    Takes a latent state and maps it to the image it was created by.
+    """
     def __init__(self, latent_dim, num_filters_1, num_filters_2, hidden_dim=512, device='cpu'):
         super().__init__()
         self.upscaler = nn.Sequential(
