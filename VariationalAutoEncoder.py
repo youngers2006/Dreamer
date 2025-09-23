@@ -60,7 +60,7 @@ class Decoder(nn.Module):
 
     def forward(self, x: torch.tensor):
         x = self.upscaler(x)
-        x = x.view(-1, self.num_filters_2, 8, 8)
+        x = x.view(-1, self.num_filters_2, self.upscale_starting_dim, self.upscale_starting_dim)
         obs_params = self.image_builder(x)
         mu, sigma_logits = torch.chunk(obs_params, chunks=2, dim=1)
         sigma = self.softplus(sigma_logits) + 1e-4
