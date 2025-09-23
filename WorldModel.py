@@ -17,11 +17,14 @@ class WorldModel(nn.Module):
         self.reward_predictor = RewardPredictor()
         self.continue_predictor = ContinuePredictor()
         self.decoder = Decoder()
+
+        def encode_observation(self, observation):
+            return self.encoder.encode()
     
-        def imagine_step(self, last_hidden_state, last_latent_state, action):
-            hidden_state = self.sequence_model(last_hidden_state, last_latent_state, action)
-            latent_state = self.dynamics_predictor.predict(hidden_state)
-            reward = self.reward_predictor(hidden_state, latent_state)
-            continue_ = self.continue_predictor(hidden_state, latent_state)
+        def imagine_step(self, hidden_state, latent_state, action):
+            next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
+            next_latent_state = self.dynamics_predictor.predict(next_hidden_state)
+            reward = self.reward_predictor.predict(next_hidden_state, next_latent_state)
+            continue_ = self.continue_predictor.predict(next_hidden_state, next_latent_state)
             return hidden_state, latent_state, reward, continue_
 
