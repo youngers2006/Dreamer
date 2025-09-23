@@ -42,12 +42,13 @@ class Decoder(nn.Module):
     """
     Takes a latent state and maps it to the image it was created by.
     """
-    def __init__(self, latent_dim, observation_dims, num_filters_1, num_filters_2, hidden_dim=512, device='cpu'):
+    def __init__(self, latent_dim, observation_dim, num_filters_1, num_filters_2, hidden_dim=512, device='cpu'):
         super().__init__()
+        self.upscale_starting_dim = observation_dim / 4
         self.upscaler = nn.Sequential(
             nn.Linear(in_features=latent_dim, out_features=hidden_dim),
             nn.SiLU(),
-            nn.Linear(in_features=hidden_dim, out_features=num_filters_2 * 8 * 8),
+            nn.Linear(in_features=hidden_dim, out_features=num_filters_2 * self.upscale_starting_dim * self.upscale_starting_dim),
             nn.SiLU()
         )
         self.image_builder = nn.Sequential(
@@ -57,16 +58,19 @@ class Decoder(nn.Module):
         )
         self.softplus = nn.Softplus()
 
-    def forward(self, x):
-        obs_params = self.upscaler(x)
+    def forward(self, x: torch.tensor):
+        x = self.upscaler(x)
+        x = x.view(-1, self.num_filters_2, 8, 8)
+        obs_params = self.image_builder(x)
         mu, sigma_logits = torch.chunk(obs_params, chunks=2, dim=1)
         sigma = self.softplus(sigma_logits) + 1e-4
         return mu, sigma
     
-    def decode(self, latent_state):
+    def decode(self, latent_state: torch.tensor):
         mu, sigma = self.forward(latent_state)
         dist = torch.distributions.Independent(torch.distributions.Normal(loc=mu, scale=sigma), 3)
         observation = dist.rsample()
+        return observation
 
 
     
