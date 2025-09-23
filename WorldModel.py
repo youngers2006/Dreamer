@@ -19,7 +19,10 @@ class WorldModel(nn.Module):
         self.decoder = Decoder()
 
         def encode_observation(self, observation):
-            return self.encoder.encode()
+            return self.encoder.encode(observation)
+        
+        def decode_latent_state(self, latent_state):
+            return self.decoder.decode(latent_state)
     
         def imagine_step(self, hidden_state, latent_state, action):
             next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
