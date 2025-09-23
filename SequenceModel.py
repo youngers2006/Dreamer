@@ -1,0 +1,27 @@
+import torch
+import torch.nn as nn
+
+class SequenceModel(nn.Module):
+    def __init__(self, latent_dim, hidden_dim, action_dim, output_dim, *, num_layers=1, device='cpu'):
+        super().__init__()
+        self.latent_dim = latent_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.num_layers = num_layers
+        self.device = device
+
+        self.GRU = nn.GRU(
+            input_size=latent_dim + action_dim, 
+            hidden_size=hidden_dim, 
+            num_layers=num_layers, 
+            batch_first=False,
+            device=device
+        )
+
+    def forward(self, last_latent_state: torch.tensor, last_hidden_state: torch.tensor, last_action: torch.tensor):
+        input = torch.cat((last_latent_state, last_action), dim=-1)
+        input = input.unsqueeze(0)
+        last_hidden_state = last_hidden_state.unsqueeze(0)
+        _, hidden = self.GRU(input, last_hidden_state)
+        return hidden.squeeze(0)
+
