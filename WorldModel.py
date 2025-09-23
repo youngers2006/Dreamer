@@ -18,5 +18,5 @@ class WorldModel(nn.Module):
         self.continue_predictor = ContinuePredictor()
         self.decoder = Decoder()
     
-    def train(self):
+    
 
