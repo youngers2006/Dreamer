@@ -18,17 +18,5 @@ class WorldModel(nn.Module):
         self.continue_predictor = ContinuePredictor()
         self.decoder = Decoder()
     
-    def imagine_episode(self):
-        hidden_state = 0
-        latent_state = self.dynamics_predictor(hidden_state)
-        while self.continue_predictor(hidden_state, latent_state):
-            last_hidden_state = hidden_state
-            last_latent_state = latent_state
-
-            
-
-
-        return state, hidden_state
-    
     def train(self):
 
