@@ -26,8 +26,8 @@ class DynamicsPredictor(nn.Module):
     def predict(self, hidden_state: torch.tensor):
         mu, sigma = self.forward(hidden_state)
         dist = torch.distributions.Normal(loc=mu, scale=sigma)
-        next_state = dist.rsample(self.latent_size)
-        return next_state
+        next_latent_state = dist.rsample(self.latent_size)
+        return next_latent_state
     
 class RewardPredictor(nn.Module):
     """
