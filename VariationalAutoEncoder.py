@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class Encoder(nn.Module):
-    def __init__(self, num_filters_1, num_filters_2, latent_size, device='cpu'):
+    def __init__(self, latent_size, hidden_state, dim, num_filters_1, num_filters_2, device='cpu'):
         """
         Takes obseravtion (image in this class) and maps it to a latent state representation through a CNN.
         """
@@ -24,16 +24,19 @@ class Encoder(nn.Module):
         self.mu_head = nn.Linear(in_features=512, out_features=latent_size, device=device)
         self.log_sig_head = nn.Linear(in_features=512, out_features=latent_size, device=device)
 
-    def forward(self, x):
-        x = self.feature_extractor(x)
-        x = self.latent_mapper_base(x)
+    def forward(self, x1, x2):
+        features = self.feature_extractor(x1)
+        _, _, H, W = features.shape
+        x2 = x2.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, H, W)
+        input = torch.cat((features, x2), axis=1)
+        x = self.latent_mapper_base(input)
         mu = self.mu_head(x)
         log_sig = self.log_sig_head(x)
         sigma = torch.exp(log_sig)
         return mu, sigma
     
-    def encode(self, observation):
-        mu, sigma = self.forward(observation)
+    def encode(self, observation, hidden_state):
+        mu, sigma = self.forward(observation, hidden_state)
         dist = torch.distributions.Normal(loc=mu, scale=sigma)
         latent_state = dist.rsample()
         return latent_state
@@ -42,11 +45,11 @@ class Decoder(nn.Module):
     """
     Takes a latent state and maps it to the image it was created by.
     """
-    def __init__(self, latent_dim, observation_dim, num_filters_1, num_filters_2, hidden_dim=512, device='cpu'):
+    def __init__(self, latent_dim, observation_dim, hidden_state_dim, num_filters_1, num_filters_2, hidden_dim=512, device='cpu'):
         super().__init__()
         self.upscale_starting_dim = observation_dim / 4
         self.upscaler = nn.Sequential(
-            nn.Linear(in_features=latent_dim, out_features=hidden_dim),
+            nn.Linear(in_features=latent_dim + hidden_state_dim, out_features=hidden_dim),
             nn.SiLU(),
             nn.Linear(in_features=hidden_dim, out_features=num_filters_2 * self.upscale_starting_dim * self.upscale_starting_dim),
             nn.SiLU()
@@ -58,7 +61,8 @@ class Decoder(nn.Module):
         )
         self.softplus = nn.Softplus()
 
-    def forward(self, x: torch.tensor):
+    def forward(self, x1: torch.tensor, x2: torch.tensor):
+        x = torch.cat((x1, x2), dim=-1)
         x = self.upscaler(x)
         x = x.view(-1, self.num_filters_2, self.upscale_starting_dim, self.upscale_starting_dim)
         obs_params = self.image_builder(x)
@@ -66,8 +70,8 @@ class Decoder(nn.Module):
         sigma = self.softplus(sigma_logits) + 1e-4
         return mu, sigma
     
-    def decode(self, latent_state: torch.tensor):
-        mu, sigma = self.forward(latent_state)
+    def decode(self, latent_state: torch.tensor, hidden_state: torch.tensor):
+        mu, sigma = self.forward(latent_state, hidden_state)
         dist = torch.distributions.Independent(torch.distributions.Normal(loc=mu, scale=sigma), 3)
         observation = dist.rsample()
         return observation

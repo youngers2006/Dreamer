@@ -22,11 +22,11 @@ class WorldModel(nn.Module):
         self.continue_predictor = ContinuePredictor()
         self.decoder = Decoder()
 
-    def encode_observation(self, observation):
-        return self.encoder.encode(observation)
+    def encode_observation(self, observation, hidden_state):
+        return self.encoder.encode(observation, hidden_state)
         
-    def decode_latent_state(self, latent_state):
-        return self.decoder.decode(latent_state)
+    def decode_latent_state(self, latent_state, hidden_state):
+        return self.decoder.decode(latent_state, hidden_state)
     
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
@@ -35,8 +35,10 @@ class WorldModel(nn.Module):
         continue_ = self.continue_predictor.predict(next_hidden_state, next_latent_state)
         return next_hidden_state, next_latent_state, next_reward, continue_
     
-    def observe_step(self):
-        pass
+    def observe_step(self, last_latent, last_hidden, last_action, observation):
+        hidden_state = self.sequence_model.forward(last_latent, last_hidden, last_action)
+        latent_state = self.encode_observation(observation, hidden_state)
+        return latent_state, hidden_state
     
     def training_step(self, observation_sequences: torch.tensor, action_sequences: torch.tensor, reward_sequences: torch.tensor, continue_sequences: torch.tensor):
         loss_pred = - torch.log() - torch.log() - torch.log()
