@@ -25,18 +25,18 @@ class Encoder(nn.Module):
         self.log_sig_head = nn.Linear(in_features=512, out_features=latent_size, device=device)
 
     def forward(self, x1, x2):
-        features = self.feature_extractor(x1)
+        features = self.feature_extractor(x2)
         _, _, H, W = features.shape
-        x2 = x2.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, H, W)
-        input = torch.cat((features, x2), axis=1)
+        x1 = x1.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, H, W)
+        input = torch.cat((features, x1), axis=1)
         x = self.latent_mapper_base(input)
         mu = self.mu_head(x)
         log_sig = self.log_sig_head(x)
         sigma = torch.exp(log_sig)
         return mu, sigma
     
-    def encode(self, observation, hidden_state):
-        mu, sigma = self.forward(observation, hidden_state)
+    def encode(self, hidden_state, observation):
+        mu, sigma = self.forward(hidden_state, observation)
         dist = torch.distributions.Normal(loc=mu, scale=sigma)
         latent_state = dist.rsample()
         return latent_state
@@ -70,8 +70,8 @@ class Decoder(nn.Module):
         sigma = self.softplus(sigma_logits) + 1e-4
         return mu, sigma
     
-    def decode(self, latent_state: torch.tensor, hidden_state: torch.tensor):
-        mu, sigma = self.forward(latent_state, hidden_state)
+    def decode(self, hidden_state: torch.tensor, latent_state: torch.tensor):
+        mu, sigma = self.forward(hidden_state, latent_state)
         dist = torch.distributions.Independent(torch.distributions.Normal(loc=mu, scale=sigma), 3)
         observation = dist.rsample()
         return observation

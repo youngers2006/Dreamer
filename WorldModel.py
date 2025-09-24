@@ -3,6 +3,7 @@ import torch.nn as nn
 from VariationalAutoEncoder import Decoder, Encoder
 from DynamicsPredictors import DynamicsPredictor, RewardPredictor, ContinuePredictor
 from SequenceModel import SequenceModel
+import torch.distributions as distributions
 
 class WorldModel(nn.Module):
     def __init__(self, hidden_dims, latent_dims, optimiser, beta_pred, beta_dyn, beta_reg, device='cpu'):
@@ -41,9 +42,20 @@ class WorldModel(nn.Module):
         return latent_state, hidden_state
     
     def training_step(self, observation_sequences: torch.tensor, action_sequences: torch.tensor, reward_sequences: torch.tensor, continue_sequences: torch.tensor):
-        loss_pred = - torch.log() - torch.log() - torch.log()
-        loss_dyn = torch.max(1, torch.kl_div())
-        loss_reg = torch.max(torch.kl_div(), 1)
+        dec_mu, dec_sig = self.decoder(hi) ; rew_mu, rew_sig = self.reward_predictor() ; cont_mu, cont_sig = self.continue_predictor()
+        enc_mu, enc_sig = self.encoder() ; dyn_mu, dyn_sig = self.dynamics_predictor()
+        decoder_dist = distributions.Normal(loc=dec_mu, scale=dec_sig)
+        reward_dist = distributions.Normal(loc=rew_mu, scale=rew_sig)
+        continue_dist = distributions.Normal(loc=cont_mu, scale=cont_sig)
+        encoder_dist = distributions.Normal(loc=enc_mu, scale=enc_sig)
+        dynamics_dist = distributions.Normal(loc=dyn_mu, scale=dyn_sig)
+
+        target_dyn = encoder_dist.log_prob(latent_state)
+        target_reg = dynamics_dist.log_prob(latent_state)
+
+        loss_pred = - decoder_dist.log_prob(observation) - reward_dist.log_prob(reward) - continue_dist.log_prob(continue_)
+        loss_dyn = torch.max(1, torch.kl_div(dynamics_dist.log_prob(latent_state), target_dyn.detach()))
+        loss_reg = torch.max(1, torch.kl_div(encoder_dist.log_prob(latent_state), target_reg.detach()))
         total_loss = torch.sum(self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_reg * loss_reg)
 
         self.optimiser.reset()
