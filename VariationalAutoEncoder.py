@@ -39,7 +39,7 @@ class Encoder(nn.Module):
         mu, sigma = self.forward(hidden_state, observation)
         dist = torch.distributions.Normal(loc=mu, scale=sigma)
         latent_state = dist.rsample()
-        return latent_state
+        return latent_state, mu,sigma
 
 class Decoder(nn.Module):
     """
@@ -74,7 +74,7 @@ class Decoder(nn.Module):
         mu, sigma = self.forward(hidden_state, latent_state)
         dist = torch.distributions.Independent(torch.distributions.Normal(loc=mu, scale=sigma), 3)
         observation = dist.rsample()
-        return observation
+        return observation, mu, sigma
 
 
     

@@ -74,12 +74,12 @@ class ContinuePredictor(nn.Module):
 
     def forward(self, x):
         logit = self.logit_generator(x)
-        return logit
+        probability = torch.sigmoid(logit)
+        return probability, logit
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
         state = torch.cat(hidden_state, latent_state)
-        logit = self.forward(state)
-        probability = torch.sigmoid(logit)
+        probability, _ = self.forward(state)
         continue_ = (probability <= 0.05)
         return continue_
     
