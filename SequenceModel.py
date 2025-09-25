@@ -2,11 +2,10 @@ import torch
 import torch.nn as nn
 
 class SequenceModel(nn.Module):
-    def __init__(self, latent_dim, hidden_dim, action_dim, output_dim, *, num_layers=1, device='cpu'):
+    def __init__(self, latent_dim, hidden_dim, action_dim, *, num_layers=1, device='cpu'):
         super().__init__()
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
         self.num_layers = num_layers
         self.device = device
 

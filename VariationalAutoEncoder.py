@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 
 class Encoder(nn.Module):
-    def __init__(self, latent_size, hidden_state, dim, num_filters_1, num_filters_2, device='cpu'):
+    def __init__(self, latent_size, num_filters_1, num_filters_2, hidden_layer_nodes, device='cpu'):
         """
         Takes obseravtion (image in this class) and maps it to a latent state representation through a CNN.
-        """
+        """ 
         super().__init__()
         self.latent_size = latent_size
         self.feature_extractor = nn.Sequential(
@@ -18,11 +18,11 @@ class Encoder(nn.Module):
         )
         self.latent_mapper_base = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features=num_filters_2 * 2 * 2, out_features=512, device=device),
+            nn.Linear(in_features=num_filters_2 * 2 * 2, out_features=hidden_layer_nodes, device=device),
             nn.SiLU(),
         )
-        self.mu_head = nn.Linear(in_features=512, out_features=latent_size, device=device)
-        self.log_sig_head = nn.Linear(in_features=512, out_features=latent_size, device=device)
+        self.mu_head = nn.Linear(in_features=hidden_layer_nodes, out_features=latent_size, device=device)
+        self.log_sig_head = nn.Linear(in_features=hidden_layer_nodes, out_features=latent_size, device=device)
 
     def forward(self, x1, x2):
         features = self.feature_extractor(x2)
@@ -45,13 +45,13 @@ class Decoder(nn.Module):
     """
     Takes a latent state and maps it to the image it was created by.
     """
-    def __init__(self, latent_dim, observation_dim, hidden_state_dim, num_filters_1, num_filters_2, hidden_dim=512, device='cpu'):
+    def __init__(self, latent_dim, observation_dim, hidden_state_dim, num_filters_1, num_filters_2, hidden_layer_nodes, device='cpu'):
         super().__init__()
         self.upscale_starting_dim = observation_dim / 4
         self.upscaler = nn.Sequential(
-            nn.Linear(in_features=latent_dim + hidden_state_dim, out_features=hidden_dim),
+            nn.Linear(in_features=latent_dim + hidden_state_dim, out_features=hidden_layer_nodes),
             nn.SiLU(),
-            nn.Linear(in_features=hidden_dim, out_features=num_filters_2 * self.upscale_starting_dim * self.upscale_starting_dim),
+            nn.Linear(in_features=hidden_layer_nodes, out_features=num_filters_2 * self.upscale_starting_dim * self.upscale_starting_dim),
             nn.SiLU()
         )
         self.image_builder = nn.Sequential(
