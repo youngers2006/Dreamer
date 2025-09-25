@@ -10,6 +10,7 @@ class Dreamer(nn.Module):
         self.actor = Actor()
         self.critic = Critic()
 
-        combined_params = list(self.actor.parameters(), self.critic.parameters())
-        self.world_model_optimiser = optim.AdamW(params=self.world_model.parameters(), lr=world_model_lr)
-        self.actor_critic_optimiser = optim.AdamW(params=combined_params, lr=actor_critic_lr)
+    def learn_world_model(self):
+        pass
+
+    def 

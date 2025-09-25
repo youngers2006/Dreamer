@@ -17,7 +17,9 @@ class WorldModel(nn.Module):
             action_dims, 
             training_horizon, 
             batch_size, 
-            optimiser, 
+            WM_lr,
+            WM_betas,
+            WM_eps,
             beta_pred, 
             beta_dyn, 
             beta_rep, 
@@ -43,7 +45,12 @@ class WorldModel(nn.Module):
         self.state_dims = latent_dims + hidden_dims # st = [ht, zt]
         self.horizon = training_horizon
 
-        self.optimiser = optimiser
+        self.optimiser = torch.optim.AdamW(
+            self.parameters(), 
+            lr=WM_lr, 
+            betas=(WM_betas[0], WM_betas[1]), 
+            eps=WM_eps
+        )
         self.beta_pred = beta_pred
         self.beta_dyn = beta_dyn
         self.beta_rep = beta_rep
@@ -57,18 +64,18 @@ class WorldModel(nn.Module):
         self.decoder = Decoder(latent_dims, observation_dims, hidden_dims, num_decoder_filters_1, num_decoder_filters_2, decoder_hidden_layer_nodes, device=device)
         self.device = device
 
-    def encode_observation(self, observation, hidden_state):
-        return self.encoder.encode(observation, hidden_state)
-        
-    def decode_latent_state(self, latent_state, hidden_state):
-        return self.decoder.decode(latent_state, hidden_state)
-    
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
         next_latent_state = self.dynamics_predictor.predict(next_hidden_state)
         next_reward = self.reward_predictor.predict(next_hidden_state, next_latent_state)
         continue_ = self.continue_predictor.predict(next_hidden_state, next_latent_state)
         return next_hidden_state, next_latent_state, next_reward, continue_
+    
+    def encode_observation(self, observation, hidden_state):
+        return self.encoder.encode(observation, hidden_state)
+        
+    def decode_latent_state(self, latent_state, hidden_state):
+        return self.decoder.decode(latent_state, hidden_state)
     
     def observe_step(self, last_latent, last_hidden, last_action, observation) -> tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
         hidden_state = self.sequence_model.forward(last_latent, last_hidden, last_action)
@@ -91,7 +98,7 @@ class WorldModel(nn.Module):
             rew_likelyhood_seq = torch.zeros(self.horizon, 1, dtype=torch.float32, device=self.device) 
             cont_likelyhood_seq = torch.zeros(self.horizon, 1, dtype=torch.float32, device=self.device)
 
-            for t in range(1, self.horizon):
+            for t in range(self.horizon):
                 posterior_latent, hidden_state, posterior_latent_mu, posterior_latent_sig = self.observe_step(
                     init_latent_state_sequence[t-1],
                     init_hidden_state_sequence[t-1],
@@ -143,20 +150,115 @@ class WorldModel(nn.Module):
             continue_sequences
         )
 
-        Dkl_dyn = kullback_leibler_divergence_between_gaussians(posterior_mu.detach(), posterior_sigma.detach(), prior_mu, prior_sigma)
-        Dkl_rep = kullback_leibler_divergence_between_gaussians(posterior_mu, posterior_sigma, prior_mu.detach(), prior_sigma.detach())
-        loss_pred = - obs_log_lh - rew_log_lh - cont_log_lh
-        loss_dyn = torch.max(1, Dkl_dyn, dim=0)
-        loss_rep = torch.max(1, Dkl_rep, dim=0)
-        combined_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
-        total_loss = combined_loss.mean()
+        Dkl_dyn = kullback_leibler_divergence_between_gaussians(posterior_mu.detach(), posterior_sigma.detach(), prior_mu, prior_sigma).sum(dim=-1).mean()
+        Dkl_rep = kullback_leibler_divergence_between_gaussians(posterior_mu, posterior_sigma, prior_mu.detach(), prior_sigma.detach()),sum(dim=-1).mean()
+        loss_pred_batch = - obs_log_lh - rew_log_lh - cont_log_lh
+        loss_pred = loss_pred_batch.mean()
+        loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
+        loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
+        total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
 
-        self.optimiser.reset()
+        self.optimiser.zero_grad()
         total_loss.backward()
+        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
         self.optimiser.step()
 
         return total_loss
+    
+
+
+    """
+    def _single_sequence_unroll(self, observation_sequence, action_sequence, h_state, z_state):
+        # FIX: This function now correctly carries state forward.
+        # It takes a SINGLE initial state, not a sequence of zero-states.
         
+        posterior_mus, posterior_sigmas = [], []
+        prior_mus, prior_sigmas = [], []
+        obs_log_probs, rew_log_probs, cont_log_probs = [], [], []
+
+        for t in range(self.horizon):
+            # FIX: State is now correctly passed from the previous iteration
+            prev_action = action_sequence[t-1] if t > 0 else torch.zeros_like(action_sequence[0])
+            h_state = self.sequence_model(z_state, prev_action, h_state)
+            
+            # --- Get distributions ---
+            # NOTE: Assuming your predictors return (mu, sigma) or (prob)
+            prior_latent_mu, prior_latent_sig = self.dynamics_predictor(h_state)
+            
+            # NOTE: Assuming your encoder returns a sampled state and its params
+            z_state, posterior_latent_mu, posterior_latent_sig = self.encoder(observation_sequence[t], h_state)
+
+            dec_mu, dec_sig = self.decoder(h_state, z_state)
+            rew_mu, rew_sig = self.reward_predictor(h_state, z_state)
+            cont_prob = self.continue_predictor(h_state, z_state)
+
+            # --- Calculate Log Probs ---
+            # NOTE: Assuming manual functions for now as in your code
+            obs_log_probs.append(gaussian_log_probability(observation_sequence[t], dec_mu, dec_sig))
+            rew_log_probs.append(gaussian_log_probability(reward_sequence[t], rew_mu, rew_sig)) # Requires reward_sequence
+            cont_log_probs.append(bernoulli_log_probability(cont_prob, continue_sequence[t])) # Requires continue_sequence
+
+            # --- Store parameters for KL loss ---
+            posterior_mus.append(posterior_latent_mu)
+            posterior_sigmas.append(posterior_latent_sig)
+            prior_mus.append(prior_latent_mu)
+            prior_sigmas.append(prior_latent_sig)
+
+        # FIX: Stack the results after the loop to create sequence tensors
+        return (torch.stack(prior_mus), torch.stack(prior_sigmas),
+                torch.stack(posterior_mus), torch.stack(posterior_sigmas),
+                torch.stack(obs_log_probs), torch.stack(rew_log_probs),
+                torch.stack(cont_log_probs))
 
 
+    def training_step(self, observation_sequences, action_sequences, reward_sequences, continue_sequences):
+        
+        # FIX: Permute data for vmap from [T, B, ...] to [B, T, ...]
+        observation_sequences = observation_sequences.permute(1, 0, 2, 3, 4)
+        action_sequences = action_sequences.permute(1, 0, 2)
+        
+        batch_size = observation_sequences.size(0)
 
+        # FIX: Create a single initial state for each batch item
+        init_hidden_state = torch.zeros(batch_size, self.hidden_dims, device=self.device)
+        init_latent_state = torch.zeros(batch_size, self.latent_dims, device=self.device)
+
+        # FIX: Corrected vmap call signature (in_dims)
+        # We need to pass rewards and continues into the unroll function for the loss.
+        # This vmap is now over single sequences and single initial states.
+        # For simplicity, I'm integrating the unroll logic directly here.
+        # A full vmap implementation would require restructuring the inner function.
+        # The most direct fix is to use the efficient RNN processing.
+        
+        # --- REPLACING THE COMPLEX vmap/loop with a standard RNN forward pass ---
+        # This is the simplest and most correct fix that preserves your intent.
+        prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_log_lh, rew_log_lh, cont_log_lh = \
+            self.unroll_and_predict_scan(observation_sequences, action_sequences)
+        
+        # --- LOSS CALCULATION ---
+        # FIX: All loss components are now calculated correctly on the full sequence
+        loss_pred = -(obs_log_lh.mean() + rew_log_lh.mean() + cont_log_lh.mean())
+
+        Dkl_dyn = kullback_leibler_divergence_between_gaussians(
+            posterior_mu.detach(), posterior_sigma.detach(), prior_mu, prior_sigma
+        ).sum(dim=-1).mean()
+        
+        # FIX: Corrected syntax error (removed extra comma) and logic
+        Dkl_rep = kullback_leibler_divergence_between_gaussians(
+            posterior_mu, posterior_sigma, prior_mu.detach(), prior_sigma.detach()
+        ).sum(dim=-1).mean()
+
+        # FIX: Correct torch.max syntax and combined loss logic
+        loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
+        loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
+        
+        total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
+
+        # --- OPTIMIZER STEP ---
+        self.optimizer.zero_grad() # FIX: Correct method name
+        total_loss.backward()
+        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
+        self.optimizer.step()
+
+        return total_loss.item()
+    """
