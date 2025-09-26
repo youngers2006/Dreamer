@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
+from DreamerUtils import gaussian_log_probability
 
-class Agent(nn.Module):
+class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(
             self, 
             action_dim,
@@ -13,9 +14,13 @@ class Agent(nn.Module):
             HL_A2,
             HL_C1,
             HL_C2, 
-            AC_lr, 
-            AC_betas, 
-            AC_eps,
+            A_lr, 
+            A_betas, 
+            A_eps,
+            C_lr, 
+            C_betas, 
+            C_eps,
+            nu,
             *, 
             device='cpu'
         ):
@@ -23,16 +28,44 @@ class Agent(nn.Module):
         self.actor = Actor(action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, HL_A1, HL_A2, device=device)
         self.critic = Critic(latent_column_dim, latent_row_dim, hidden_state_dim, HL_C1, HL_C2, device=device)
 
-        self.optimiser = torch.optim.AdamW(
+        self.nu = nu
+
+        self.actor_optimiser = torch.optim.AdamW(
             params=self.parameters(),
-            lr=AC_lr,
-            betas=(AC_betas[0], AC_betas[1]),
-            eps=AC_eps
+            lr=A_lr,
+            betas=(A_betas[0], A_betas[1]),
+            eps=A_eps
+        )
+        self.critic_optimiser = torch.optim.AdamW(
+            params=self.parameters(),
+            lr=C_lr,
+            betas=(C_betas[0], C_betas[1]),
+            eps=C_eps
         )
 
-    def train_step(self, ):
-        pass
+    def train_step(self, z_batch_seq, h_batch_seq, R_lambda_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
+        value_batched_seq = self.critic.forward(z_batch_seq, h_batch_seq)
+        advantage_batched_seq = R_lambda_batch_seq - value_batched_seq
 
+        a_dist_batch_seq = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
+        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq)
+        actor_entropy_batched_seq = a_dist_batch_seq.entropy()
+        loss_batched_seq_actor = log_prob_batch_seq * advantage_batched_seq.detach() + self.nu.detach() * actor_entropy_batched_seq.detach()
+        loss_actor = torch.mean(loss_batched_seq_actor, keepdim=False)
+        loss_actor *= -1.0
+
+        loss_batched_seq_critic = (0.5) * torch.square(value_batched_seq - R_lambda_batch_seq.detach())
+        loss_critic = torch.mean(loss_batched_seq_critic, keepdim=False)
+
+        self.actor_optimiser.zero_grad()
+        loss_actor.backward()
+        self.actor_optimiser.step()
+
+        self.critic_optimiser.zero_grad()
+        loss_critic.backward()
+        self.critic_optimiser.step()
+        return loss_actor, loss_critic
+        
 class Actor(nn.Module):
     def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
         super().__init__()

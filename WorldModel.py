@@ -71,15 +71,9 @@ class WorldModel(nn.Module):
         continue_ = self.continue_predictor.predict(next_hidden_state, next_latent_state)
         return next_hidden_state, next_latent_state, next_reward, continue_
     
-    def encode_observation(self, observation, hidden_state):
-        return self.encoder.encode(observation, hidden_state)
-        
-    def decode_latent_state(self, latent_state, hidden_state):
-        return self.decoder.decode(latent_state, hidden_state)
-    
     def observe_step(self, last_latent, last_hidden, last_action, observation) -> tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
         hidden_state = self.sequence_model.forward(last_latent, last_hidden, last_action)
-        latent_state, latent_mu, latent_sigma = self.encode_observation(observation, hidden_state)
+        latent_state, latent_mu, latent_sigma = self.encoder.encode(observation, hidden_state)
         return latent_state, hidden_state, latent_mu, latent_sigma
     
     def unroll_model(
