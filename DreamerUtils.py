@@ -22,3 +22,6 @@ def kullback_leibler_divergence_between_gaussians(
     mean_diff = torch.square(mu_1 - mu_2)
     Dkl = torch.log(sigma_2 / sigma_1) + ((var_1 + mean_diff) / (2 * var_2)) - 0.5
     return Dkl
+
+def compute_lambda_return(reward_sequence):
+    return R_lambda
