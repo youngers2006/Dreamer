@@ -21,6 +21,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             C_betas, 
             C_eps,
             nu,
+            lambda_,
+            gamma,
             *, 
             device='cpu'
         ):
@@ -29,6 +31,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.critic = Critic(latent_column_dim, latent_row_dim, hidden_state_dim, HL_C1, HL_C2, device=device)
 
         self.nu = nu
+        self.lambda_ = lambda_
+        self.gamma = gamma
 
         self.actor_optimiser = torch.optim.AdamW(
             params=self.parameters(),
@@ -43,7 +47,14 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             eps=C_eps
         )
 
-    def train_step(self, z_batch_seq, h_batch_seq, R_lambda_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
+    def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
+        R_lambda_batch_seq = self.compute_batched_R_lambda_returns(
+                h_batch_seq,
+                z_batch_seq,
+                reward_batch_seq,
+                continue_batch_seq,
+                continue_batch_seq.shape[1]
+            )
         value_batched_seq = self.critic.forward(z_batch_seq, h_batch_seq)
         advantage_batched_seq = R_lambda_batch_seq - value_batched_seq
 
@@ -65,6 +76,25 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         loss_critic.backward()
         self.critic_optimiser.step()
         return loss_actor, loss_critic
+    
+    def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
+        def compute_R_lambda_returns(hidden_state_seq, latent_state_seq, reward_seq, continue_seq, seq_length):
+            value_estimate_seq = self.critic(hidden_state_seq, latent_state_seq).detach()
+            R_lambda_seq = [value_estimate_seq[-1]]
+            for t in reversed(range(seq_length-1)):
+                R_lambda = reward_seq[t] + self.gamma * continue_seq[t] * ((1 - self.lambda_) * value_estimate_seq[t+1] + self.lambda_ * R_lambda_seq[0])
+                R_lambda_seq.insert(0, R_lambda)
+            R_lambda_seq = torch.stack(R_lambda_seq, dim=0)
+            return R_lambda_seq
+        
+        R_lambda_batched_seq = torch.vmap(compute_R_lambda_returns, in_dims=(0,0,0,0,None))(
+            hidden_state_batched_seq, 
+            latent_state_batched_seq, 
+            reward_batched_seq, 
+            continue_batched_seq, 
+            seq_length
+        )
+        return R_lambda_batched_seq
         
 class Actor(nn.Module):
     def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):

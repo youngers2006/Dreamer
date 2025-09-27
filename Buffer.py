@@ -6,4 +6,6 @@ class Buffer:
         reward_buffer = torch.zeros(buffer_size, dtype=torch.float32, device=device)
         continue_buffer = torch.zeros(buffer_size, dtype=torch.float32, device=device)
 
+    def add_to_buffer(self):
+
     def sample_sequence(self):

@@ -5,8 +5,10 @@ class DynamicsPredictor(nn.Module):
     """
     Takes the current hidden state of the sequence model and predicts the encoded state
     """
-    def __init__(self, latent_size, hidden_state_size, hidden_L1, hidden_L2, device):
-        self.latent_size = latent_size
+    def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, device):
+        self.latent_num_rows = latent_num_rows
+        self.latent_num_columns = latent_num_columns
+        self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
         self.base_network = nn.Sequential(
             nn.Linear(in_features=hidden_state_size, out_features=hidden_L1, device=device),
@@ -14,8 +16,8 @@ class DynamicsPredictor(nn.Module):
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
             nn.SiLU()
         )
-        self.mu_head = nn.Linear(in_features=hidden_L2, out_features=latent_size, device=device)
-        self.log_sig_head = nn.Linear(in_features=hidden_L2, out_features=latent_size, device=device)
+        self.mu_head = nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
+        self.log_sig_head = nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
 
     def forward(self, x):
         x = self.base_network(x)
@@ -28,17 +30,19 @@ class DynamicsPredictor(nn.Module):
         mu, sigma = self.forward(hidden_state)
         dist = torch.distributions.Normal(loc=mu, scale=sigma)
         next_latent_state = dist.rsample()
+        next_latent_state.view(size=[self.latent_num_rows, self.latent_num_columns], dtype=torch.float32)
         return next_latent_state
     
 class RewardPredictor(nn.Module):
     """
     Takes the current hidden state of the sequence model and the latent state and predicts the reward
     """
-    def __init__(self, latent_size, hidden_state_size, hidden_L1, hidden_L2, device):
-        self.latent_size = latent_size
+    def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, device):
+        self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
+        self.flatten = nn.Flatten()
         self.base_network = nn.Sequential(
-            nn.Linear(in_features=hidden_state_size + latent_size, out_features=hidden_L1, device=device),
+            nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
             nn.SiLU()
@@ -54,6 +58,7 @@ class RewardPredictor(nn.Module):
         return mu, sigma
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
+        latent_state = self.flatten(latent_state)
         state = torch.cat(hidden_state, latent_state)
         mu, sigma = self.forward(state)
         dist = torch.distributions.Normal(loc=mu, scale=sigma)
@@ -64,11 +69,12 @@ class ContinuePredictor(nn.Module):
     """
     Takes the current hidden state of the sequence model and the latent state and predicts if imagined predicted episode should continue
     """
-    def __init__(self, latent_size, hidden_state_size, hidden_L1, hidden_L2, device):
-        self.latent_size = latent_size
+    def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, device):
+        self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
+        self.flatten = nn.Flatten()
         self.logit_generator = nn.Sequential(
-            nn.Linear(in_features=hidden_state_size + latent_size, out_features=hidden_L1, device=device),
+            nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
             nn.SiLU(),
@@ -81,8 +87,8 @@ class ContinuePredictor(nn.Module):
         return probability, logit
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
+        latent_state = self.flatten(latent_state)
         state = torch.cat(hidden_state, latent_state)
         probability, _ = self.forward(state)
         continue_ = (probability <= 0.05)
         return continue_
-    

@@ -38,7 +38,8 @@ class WorldModel(nn.Module):
             device='cpu'
         ):
         super().__init__()
-        self.latent_dims = latent_dims
+        self.latent_num_rows = latent_dims[0]
+        self.latent_num_columns = latent_dims[1]
         self.hidden_dims = hidden_dims
         self.action_dims = action_dims
         self.observation_dim_x, self.observation_dim_y = observation_dims
@@ -84,13 +85,13 @@ class WorldModel(nn.Module):
             continue_sequence_batch: torch.tensor
         ):
         def single_sequence_unroll(observation_sequence, action_sequence, reward_sequence, continue_sequence, init_hidden_state_sequence, init_latent_state_sequence):
-            posterior_mu = torch.zeros(self.horizon, self.latent_dims, dtype=torch.float32, device=self.device)
-            posterior_sigma = torch.zeros(self.horizon, self.latent_dims, dtype=torch.float32, device=self.device)
-            prior_mu = torch.zeros(self.horizon, self.latent_dims, dtype=torch.float32, device=self.device)
-            prior_sigma = torch.zeros(self.horizon, self.latent_dims, dtype=torch.float32, device=self.device)
-            obs_likelyhood_seq = torch.zeros(self.horizon, 1, dtype=torch.float32, device=self.device)
-            rew_likelyhood_seq = torch.zeros(self.horizon, 1, dtype=torch.float32, device=self.device) 
-            cont_likelyhood_seq = torch.zeros(self.horizon, 1, dtype=torch.float32, device=self.device)
+            posterior_mu = []
+            posterior_sigma = []
+            prior_mu = []
+            prior_sigma = []
+            obs_likelyhood_seq = []
+            rew_likelyhood_seq = [] 
+            cont_likelyhood_seq = []
 
             for t in range(self.horizon):
                 posterior_latent, hidden_state, posterior_latent_mu, posterior_latent_sig = self.observe_step(
@@ -108,11 +109,19 @@ class WorldModel(nn.Module):
                 reward_log_likelyhood = gaussian_log_probability(reward_sequence[t], rew_mu, rew_sig)
                 continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[t])
 
-                posterior_mu[t] = posterior_latent_mu ; posterior_sigma[t] = posterior_latent_sig
-                prior_mu[t] = prior_latent_mu ; prior_sigma[t] = prior_latent_sig
-                obs_likelyhood_seq[t] = observation_log_likelyhood
-                rew_likelyhood_seq[t] = reward_log_likelyhood
-                cont_likelyhood_seq[t] = continue_log_likelyhood
+                posterior_mu.append(posterior_latent_mu) ; posterior_sigma.append(posterior_latent_sig)
+                prior_mu.append(prior_latent_mu) ; prior_sigma.append(prior_latent_sig)
+                obs_likelyhood_seq.append(observation_log_likelyhood)
+                rew_likelyhood_seq.append(reward_log_likelyhood)
+                cont_likelyhood_seq.append(continue_log_likelyhood)
+            
+            prior_mu = torch.stack(prior_mu, dim=0)
+            prior_sigma = torch.stack(prior_sigma, dim=0)
+            posterior_mu = torch.stack(posterior_mu, dim=0)
+            posterior_sigma = torch.stack(posterior_sigma, dim=0)
+            obs_likelyhood_seq = torch.stack(obs_likelyhood_seq, dim=0)
+            rew_likelyhood_seq = torch.stack(rew_likelyhood_seq, dim=0)
+            cont_likelyhood_seq = torch.stack(cont_likelyhood_seq, dim=0)
             
             return prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_likelyhood_seq, rew_likelyhood_seq, cont_likelyhood_seq
 
@@ -136,7 +145,7 @@ class WorldModel(nn.Module):
             action_sequences: torch.tensor, 
             reward_sequences: torch.tensor, 
             continue_sequences: torch.tensor
-    ): # (sequence length, batch size, features)
+    ): # (batch_size, sequence_length, features)
         prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
             observation_sequences,
             action_sequences,
