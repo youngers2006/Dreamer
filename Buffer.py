@@ -1,11 +1,44 @@
 import torch
+import numpy as np
+
 class Buffer:
-    def __init__(self, buffer_size, action_size, observation_num_rows, observation_num_columns, device='cpu'):
-        observation_buffer = torch.zeros(buffer_size, observation_num_rows, observation_num_columns, dtype=torch.float32, device=device)
-        action_buffer = torch.zeros(buffer_size, action_size, dtype=torch.float32, device=device)
-        reward_buffer = torch.zeros(buffer_size, dtype=torch.float32, device=device)
-        continue_buffer = torch.zeros(buffer_size, dtype=torch.float32, device=device)
+    def __init__(self, buffer_size, sequence_length, action_size, observation_dims, device='cpu'):
+        self.observation_buffer = torch.zeros((buffer_size, *observation_dims), dtype=torch.float32, device=device)
+        self.action_buffer = torch.zeros((buffer_size, action_size), dtype=torch.float32, device=device)
+        self.reward_buffer = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
+        self.continue_buffer = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
 
-    def add_to_buffer(self):
+        self.capacity = buffer_size
+        self.sequence_length = sequence_length
 
-    def sample_sequence(self):
+        self.next_idx = 0
+        self.size = 0
+
+        self.device = device
+
+    def add_to_buffer(self, observation, action, reward, continue_):
+        self.observation_buffer[self.next_idx] = torch.tensor(observation, dtype=torch.float32, device=self.device)
+        self.action_buffer[self.next_idx] = torch.tensor(action, dtype=torch.float32, device=self.device)
+        self.reward_buffer[self.next_idx] = torch.tensor(reward, dtype=torch.float32, device=self.device)
+        self.continue_buffer[self.next_idx] = torch.tensor(continue_, dtype=torch.float32, device=self.device)
+
+        next_idx = (next_idx + 1) % self.capacity
+        if self.size < self.capacity:
+            self.size = self.size + 1
+
+    def sample_sequences(self, batch_size):
+        if self.size < self.sequence_length:
+            raise ValueError("Not enough data in buffer to sample a full sequence")
+        
+        end_index = self.size - self.sequence_length
+        start_index = np.random.randint(0, end_index, size=batch_size)
+        indices = start_index[:, None] + np.arange(self.sequence_length)[None, :]
+
+        observations = self.observation_buffer[indices]
+        actions = self.action_buffer[indices]
+        rewards = self.reward_buffer[indices]
+        continues = self.continue_buffer[indices]
+        sequence_length = self.sequence_length
+
+        return observations, actions, rewards, continues, sequence_length
+

@@ -7,8 +7,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
     def __init__(
             self, 
             action_dim,
-            latent_column_dim,
-            latent_row_dim,
+            latent_dims,
             hidden_state_dim,
             HL_A1,
             HL_A2,
@@ -27,8 +26,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             device='cpu'
         ):
         self.device = device
-        self.actor = Actor(action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, HL_A1, HL_A2, device=device)
-        self.critic = Critic(latent_column_dim, latent_row_dim, hidden_state_dim, HL_C1, HL_C2, device=device)
+        self.actor = Actor(action_dim, latent_dims[0], latent_dims[1], hidden_state_dim, HL_A1, HL_A2, device=device)
+        self.critic = Critic(latent_dims[0], latent_dims[1], hidden_state_dim, HL_C1, HL_C2, device=device)
 
         self.nu = nu
         self.lambda_ = lambda_
@@ -125,7 +124,7 @@ class Actor(nn.Module):
         return action, mu, sigma
 
 class Critic(nn.Module):
-    def __init__(self, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
+    def __init__(self, latent_row_dim, latent_column_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
         super().__init__()
         self.latent_row_dim = latent_row_dim
         self.latent_column_dim = latent_column_dim

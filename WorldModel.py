@@ -38,8 +38,7 @@ class WorldModel(nn.Module):
             device='cpu'
         ):
         super().__init__()
-        self.latent_num_rows = latent_dims[0]
-        self.latent_num_columns = latent_dims[1]
+        self.latent_num_rows, self.latent_num_columns = latent_dims
         self.hidden_dims = hidden_dims
         self.action_dims = action_dims
         self.observation_dim_x, self.observation_dim_y = observation_dims
@@ -145,7 +144,7 @@ class WorldModel(nn.Module):
             action_sequences: torch.tensor, 
             reward_sequences: torch.tensor, 
             continue_sequences: torch.tensor
-    ): # (batch_size, sequence_length, features)
+        ): # (batch_size, sequence_length, features)
         prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
             observation_sequences,
             action_sequences,
@@ -167,101 +166,3 @@ class WorldModel(nn.Module):
         self.optimiser.step()
 
         return total_loss
-    
-
-
-    """
-    def _single_sequence_unroll(self, observation_sequence, action_sequence, h_state, z_state):
-        # FIX: This function now correctly carries state forward.
-        # It takes a SINGLE initial state, not a sequence of zero-states.
-        
-        posterior_mus, posterior_sigmas = [], []
-        prior_mus, prior_sigmas = [], []
-        obs_log_probs, rew_log_probs, cont_log_probs = [], [], []
-
-        for t in range(self.horizon):
-            # FIX: State is now correctly passed from the previous iteration
-            prev_action = action_sequence[t-1] if t > 0 else torch.zeros_like(action_sequence[0])
-            h_state = self.sequence_model(z_state, prev_action, h_state)
-            
-            # --- Get distributions ---
-            # NOTE: Assuming your predictors return (mu, sigma) or (prob)
-            prior_latent_mu, prior_latent_sig = self.dynamics_predictor(h_state)
-            
-            # NOTE: Assuming your encoder returns a sampled state and its params
-            z_state, posterior_latent_mu, posterior_latent_sig = self.encoder(observation_sequence[t], h_state)
-
-            dec_mu, dec_sig = self.decoder(h_state, z_state)
-            rew_mu, rew_sig = self.reward_predictor(h_state, z_state)
-            cont_prob = self.continue_predictor(h_state, z_state)
-
-            # --- Calculate Log Probs ---
-            # NOTE: Assuming manual functions for now as in your code
-            obs_log_probs.append(gaussian_log_probability(observation_sequence[t], dec_mu, dec_sig))
-            rew_log_probs.append(gaussian_log_probability(reward_sequence[t], rew_mu, rew_sig)) # Requires reward_sequence
-            cont_log_probs.append(bernoulli_log_probability(cont_prob, continue_sequence[t])) # Requires continue_sequence
-
-            # --- Store parameters for KL loss ---
-            posterior_mus.append(posterior_latent_mu)
-            posterior_sigmas.append(posterior_latent_sig)
-            prior_mus.append(prior_latent_mu)
-            prior_sigmas.append(prior_latent_sig)
-
-        # FIX: Stack the results after the loop to create sequence tensors
-        return (torch.stack(prior_mus), torch.stack(prior_sigmas),
-                torch.stack(posterior_mus), torch.stack(posterior_sigmas),
-                torch.stack(obs_log_probs), torch.stack(rew_log_probs),
-                torch.stack(cont_log_probs))
-
-
-    def training_step(self, observation_sequences, action_sequences, reward_sequences, continue_sequences):
-        
-        # FIX: Permute data for vmap from [T, B, ...] to [B, T, ...]
-        observation_sequences = observation_sequences.permute(1, 0, 2, 3, 4)
-        action_sequences = action_sequences.permute(1, 0, 2)
-        
-        batch_size = observation_sequences.size(0)
-
-        # FIX: Create a single initial state for each batch item
-        init_hidden_state = torch.zeros(batch_size, self.hidden_dims, device=self.device)
-        init_latent_state = torch.zeros(batch_size, self.latent_dims, device=self.device)
-
-        # FIX: Corrected vmap call signature (in_dims)
-        # We need to pass rewards and continues into the unroll function for the loss.
-        # This vmap is now over single sequences and single initial states.
-        # For simplicity, I'm integrating the unroll logic directly here.
-        # A full vmap implementation would require restructuring the inner function.
-        # The most direct fix is to use the efficient RNN processing.
-        
-        # --- REPLACING THE COMPLEX vmap/loop with a standard RNN forward pass ---
-        # This is the simplest and most correct fix that preserves your intent.
-        prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_log_lh, rew_log_lh, cont_log_lh = \
-            self.unroll_and_predict_scan(observation_sequences, action_sequences)
-        
-        # --- LOSS CALCULATION ---
-        # FIX: All loss components are now calculated correctly on the full sequence
-        loss_pred = -(obs_log_lh.mean() + rew_log_lh.mean() + cont_log_lh.mean())
-
-        Dkl_dyn = kullback_leibler_divergence_between_gaussians(
-            posterior_mu.detach(), posterior_sigma.detach(), prior_mu, prior_sigma
-        ).sum(dim=-1).mean()
-        
-        # FIX: Corrected syntax error (removed extra comma) and logic
-        Dkl_rep = kullback_leibler_divergence_between_gaussians(
-            posterior_mu, posterior_sigma, prior_mu.detach(), prior_sigma.detach()
-        ).sum(dim=-1).mean()
-
-        # FIX: Correct torch.max syntax and combined loss logic
-        loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
-        loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
-        
-        total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
-
-        # --- OPTIMIZER STEP ---
-        self.optimizer.zero_grad() # FIX: Correct method name
-        total_loss.backward()
-        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
-        self.optimizer.step()
-
-        return total_loss.item()
-    """
