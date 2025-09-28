@@ -14,10 +14,9 @@ class DynamicsPredictor(nn.Module):
             nn.Linear(in_features=hidden_state_size, out_features=hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
-            nn.SiLU()
+            nn.SiLU(),
+            nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
         )
-        self.mu_head = nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
-        self.log_sig_head = nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
 
     def forward(self, x):
         x = self.base_network(x)

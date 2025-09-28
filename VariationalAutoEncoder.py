@@ -18,31 +18,28 @@ class Encoder(nn.Module):
             nn.SiLU(),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
-        self.latent_mapper_base = nn.Sequential(
+        self.latent_mapper = nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_features=num_filters_2 * 2 * 2, out_features=hidden_layer_nodes, device=device),
             nn.SiLU(),
+            nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
         )
-        self.mu_head = nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
-        self.log_sig_head = nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
 
     def forward(self, x1, x2):
         features = self.feature_extractor(x2)
         _, _, H, W = features.shape
         x1 = x1.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, H, W)
         input = torch.cat((features, x1), axis=1)
-        x = self.latent_mapper_base(input)
-        mu = self.mu_head(x)
-        log_sig = self.log_sig_head(x)
-        sigma = torch.exp(log_sig)
-        return mu, sigma
+        logits = self.latent_mapper(input)
+        return logits
     
     def encode(self, hidden_state, observation):
-        mu, sigma = self.forward(hidden_state, observation)
-        dist = torch.distributions.Normal(loc=mu, scale=sigma)
-        latent_state = dist.rsample()
-        latent_state = latent_state.view(size=[self.latent_num_rows, self.latent_num_columns], dtype=torch.float32)
-        return latent_state, mu, sigma
+        logits = self.forward(hidden_state, observation)
+        dist = torch.distributions.Categorical(logits=logits)
+        sampled_idx = dist.sample()
+        latent_state_flat = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_size)
+        latent_state = latent_state_flat.view(-1, self.latent_num_rows, self.latent_num_columns, dtype=torch.float32)
+        return latent_state, logits
 
 class Decoder(nn.Module):
     """

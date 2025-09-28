@@ -163,7 +163,7 @@ class Dreamer(nn.Module):
         observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
         continue_ = True
         hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
-        latent_state = self.world_model.encoder.encode(hidden_state, observation_tensor)
+        latent_state, _, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
         for _ in range(self.sequence_length):
             if random_policy:
                 action = env.action_space.sample()
@@ -182,9 +182,9 @@ class Dreamer(nn.Module):
                 observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
                 continue_ = True
                 hidden_state = torch.zeros(self.hidden_state_dims)
-                latent_state = self.world_model.encoder.encode(hidden_state, observation_tensor)
+                latent_state, _, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
             else:
-                hidden_state, latent_state = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
+                hidden_state, latent_state, _, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
                 observation = observation_
                 observation_tensor = observation__tensor
 
