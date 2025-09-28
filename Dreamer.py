@@ -55,6 +55,7 @@ class Dreamer(nn.Module):
             seed, 
             device
         ):
+        super().__init__()
         self.hidden_state_dims = hidden_state_dims
         self.action_dims = action_dims
         self.observation_dims = observation_dims

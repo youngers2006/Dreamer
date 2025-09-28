@@ -6,6 +6,7 @@ class DynamicsPredictor(nn.Module):
     Takes the current hidden state of the sequence model and predicts the encoded state
     """
     def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, device):
+        super().__init__()
         self.latent_num_rows = latent_num_rows
         self.latent_num_columns = latent_num_columns
         self.latent_size = latent_num_rows * latent_num_columns
@@ -35,6 +36,7 @@ class RewardPredictor(nn.Module):
     Takes the current hidden state of the sequence model and the latent state and predicts the reward
     """
     def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, device):
+        super().__init__()
         self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
         self.flatten = nn.Flatten()
@@ -67,6 +69,7 @@ class ContinuePredictor(nn.Module):
     Takes the current hidden state of the sequence model and the latent state and predicts if imagined predicted episode should continue
     """
     def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, device):
+        super().__init__()
         self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
         self.flatten = nn.Flatten()

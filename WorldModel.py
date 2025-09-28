@@ -42,7 +42,6 @@ class WorldModel(nn.Module):
         self.hidden_dims = hidden_dims
         self.action_dims = action_dims
         self.observation_dim_x, self.observation_dim_y = observation_dims
-        self.state_dims = latent_dims + hidden_dims # st = [ht, zt]
         self.horizon = training_horizon
 
         self.optimiser = torch.optim.AdamW(

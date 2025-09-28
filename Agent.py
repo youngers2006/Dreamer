@@ -25,6 +25,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             *, 
             device='cpu'
         ):
+        super().__init__()
         self.device = device
         self.actor = Actor(action_dim, latent_dims[0], latent_dims[1], hidden_state_dim, HL_A1, HL_A2, device=device)
         self.critic = Critic(latent_dims[0], latent_dims[1], hidden_state_dim, HL_C1, HL_C2, device=device)
