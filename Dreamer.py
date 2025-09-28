@@ -163,7 +163,7 @@ class Dreamer(nn.Module):
         observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
         continue_ = True
         hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
-        latent_state, _, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
+        latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
         for _ in range(self.sequence_length):
             if random_policy:
                 action = env.action_space.sample()
@@ -182,9 +182,9 @@ class Dreamer(nn.Module):
                 observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
                 continue_ = True
                 hidden_state = torch.zeros(self.hidden_state_dims)
-                latent_state, _, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
+                latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
             else:
-                hidden_state, latent_state, _, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
+                hidden_state, latent_state, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
                 observation = observation_
                 observation_tensor = observation__tensor
 
@@ -200,10 +200,10 @@ class Dreamer(nn.Module):
 
     def warm_start_generator(self, observation_seq_batch, action_seq_batch, sequence_length):
         hidden_batch = torch.zeros(self.batch_size, self.hidden_state_dims, dtype=torch.float32, device=self.device)
-        latent_batch, _, _ = self.world_model.encoder.encode(hidden_batch, observation_seq_batch[:, 0, :])
+        latent_batch, _ = self.world_model.encoder.encode(hidden_batch, observation_seq_batch[:, 0, :])
         warmup_length = sequence_length // 2
         for t in range(1, warmup_length):
-            latent_batch, hidden_batch, _, _ = self.world_model.observe_step(
+            latent_batch, hidden_batch, _ = self.world_model.observe_step(
                 latent_batch, 
                 hidden_batch, 
                 action_seq_batch[:,t-1,:], 
@@ -250,7 +250,7 @@ class Dreamer(nn.Module):
             observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
             continue_ = True
             hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
-            latent_state = self.world_model.encoder.encode(hidden_state, observation_tensor)
+            latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
             while continue_:
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
                 action_np = action.detach().cpu().numpy().squeeze()
@@ -259,7 +259,7 @@ class Dreamer(nn.Module):
                 total_reward += reward
                 done = (terminated or truncated)
                 continue_ = (1 - done)
-                hidden_state, latent_state = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
+                hidden_state, latent_state, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
                 observation = observation_
             reward_list.append(total_reward)
         reward_list = torch.stack(reward_list, dim=0)

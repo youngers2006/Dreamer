@@ -10,7 +10,7 @@ class DynamicsPredictor(nn.Module):
         self.latent_num_columns = latent_num_columns
         self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
-        self.base_network = nn.Sequential(
+        self.logit_net = nn.Sequential(
             nn.Linear(in_features=hidden_state_size, out_features=hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
@@ -19,18 +19,16 @@ class DynamicsPredictor(nn.Module):
         )
 
     def forward(self, x):
-        x = self.base_network(x)
-        mu = self.mu_head(x)
-        log_sig = self.log_sig_head(x)
-        sigma = torch.exp(log_sig)
-        return mu, sigma
+        logits = self.base_network(x)
+        return logits
     
     def predict(self, hidden_state: torch.tensor):
-        mu, sigma = self.forward(hidden_state)
-        dist = torch.distributions.Normal(loc=mu, scale=sigma)
-        next_latent_state = dist.rsample()
-        next_latent_state.view(size=[self.latent_num_rows, self.latent_num_columns], dtype=torch.float32)
-        return next_latent_state
+        logits = self.forward(hidden_state)
+        dist = torch.distributions.Categorical(logits=logits)
+        sample_idx = dist.sample()
+        latent_state_flat = torch.nn.functional.one_hot(sample_idx, num_classes=self.latent_size)
+        latent_state = latent_state_flat.view(-1, self.latent_num_rows, self.latent_num_columns, dtype=torch.float32)
+        return latent_state, logits
     
 class RewardPredictor(nn.Module):
     """

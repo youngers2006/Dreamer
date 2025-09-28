@@ -66,15 +66,15 @@ class WorldModel(nn.Module):
 
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
-        next_latent_state = self.dynamics_predictor.predict(next_hidden_state)
+        next_latent_state, _ = self.dynamics_predictor.predict(next_hidden_state)
         next_reward = self.reward_predictor.predict(next_hidden_state, next_latent_state)
         continue_ = self.continue_predictor.predict(next_hidden_state, next_latent_state)
         return next_hidden_state, next_latent_state, next_reward, continue_
     
-    def observe_step(self, last_latent, last_hidden, last_action, observation) -> tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
+    def observe_step(self, last_latent, last_hidden, last_action, observation) -> tuple[torch.tensor, torch.tensor, torch.tensor]:
         hidden_state = self.sequence_model.forward(last_latent, last_hidden, last_action)
-        latent_state, latent_mu, latent_sigma = self.encoder.encode(observation, hidden_state)
-        return latent_state, hidden_state, latent_mu, latent_sigma
+        latent_state, latent_logits = self.encoder.encode(observation, hidden_state)
+        return latent_state, hidden_state, latent_logits
     
     def unroll_model(
             self,
@@ -84,22 +84,20 @@ class WorldModel(nn.Module):
             continue_sequence_batch: torch.tensor
         ):
         def single_sequence_unroll(observation_sequence, action_sequence, reward_sequence, continue_sequence, init_hidden_state_sequence, init_latent_state_sequence):
-            posterior_mu = []
-            posterior_sigma = []
-            prior_mu = []
-            prior_sigma = []
+            posterior_logits = []
+            prior_logits = []
             obs_likelyhood_seq = []
             rew_likelyhood_seq = [] 
             cont_likelyhood_seq = []
 
             for t in range(self.horizon):
-                posterior_latent, hidden_state, posterior_latent_mu, posterior_latent_sig = self.observe_step(
+                posterior_latent, hidden_state, posterior_latent_logits = self.observe_step(
                     init_latent_state_sequence[t-1],
                     init_hidden_state_sequence[t-1],
                     action_sequence[t-1],
                     observation_sequence[t-1]
                 )
-                prior_latent_mu, prior_latent_sig = self.dynamics_predictor(hidden_state, posterior_latent)
+                prior_latent_logits = self.dynamics_predictor(hidden_state, posterior_latent)
                 dec_mu, dec_sig = self.decoder(hidden_state, posterior_latent)
                 rew_mu, rew_sig = self.reward_predictor(hidden_state, posterior_latent) 
                 cont_prob, _ = self.continue_predictor(hidden_state, posterior_latent)
@@ -108,21 +106,19 @@ class WorldModel(nn.Module):
                 reward_log_likelyhood = gaussian_log_probability(reward_sequence[t], rew_mu, rew_sig)
                 continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[t])
 
-                posterior_mu.append(posterior_latent_mu) ; posterior_sigma.append(posterior_latent_sig)
-                prior_mu.append(prior_latent_mu) ; prior_sigma.append(prior_latent_sig)
+                posterior_logits.append(posterior_latent_logits)
+                prior_logits.append(prior_latent_logits)
                 obs_likelyhood_seq.append(observation_log_likelyhood)
                 rew_likelyhood_seq.append(reward_log_likelyhood)
                 cont_likelyhood_seq.append(continue_log_likelyhood)
             
-            prior_mu = torch.stack(prior_mu, dim=0)
-            prior_sigma = torch.stack(prior_sigma, dim=0)
-            posterior_mu = torch.stack(posterior_mu, dim=0)
-            posterior_sigma = torch.stack(posterior_sigma, dim=0)
+            prior_logits = torch.stack(prior_logits, dim=0)
+            posterior_logits = torch.stack(posterior_logits, dim=0)
             obs_likelyhood_seq = torch.stack(obs_likelyhood_seq, dim=0)
             rew_likelyhood_seq = torch.stack(rew_likelyhood_seq, dim=0)
             cont_likelyhood_seq = torch.stack(cont_likelyhood_seq, dim=0)
             
-            return prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_likelyhood_seq, rew_likelyhood_seq, cont_likelyhood_seq
+            return prior_logits, posterior_logits, obs_likelyhood_seq, rew_likelyhood_seq, cont_likelyhood_seq
 
         init_hidden_state_sequence = torch.zeros(self.horizon, self.hidden_dims, dtype=torch.float32, device=self.device)
         init_latent_state_sequence = torch.zeros(self.horizon, self.latent_dims, dtype=torch.float32, device=self.device)
@@ -145,15 +141,16 @@ class WorldModel(nn.Module):
             reward_sequences: torch.tensor, 
             continue_sequences: torch.tensor
         ): # (batch_size, sequence_length, features)
-        prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
+        prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
             observation_sequences,
             action_sequences,
             reward_sequences,
             continue_sequences
         )
-
-        Dkl_dyn = kullback_leibler_divergence_between_gaussians(posterior_mu.detach(), posterior_sigma.detach(), prior_mu, prior_sigma).sum(dim=-1).mean()
-        Dkl_rep = kullback_leibler_divergence_between_gaussians(posterior_mu, posterior_sigma, prior_mu.detach(), prior_sigma.detach()),sum(dim=-1).mean()
+        prior_dist = torch.distributions.Categorical(logits=prior_logits)
+        posterior_dist = torch.distributions.Categorical(logits=posterior_logits)
+        Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist.detach(), prior_dist).sum(dim=-1).mean()
+        Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist.detach()).sum(dim=-1).mean()
         loss_pred_batch = - obs_log_lh - rew_log_lh - cont_log_lh
         loss_pred = loss_pred_batch.mean()
         loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
