@@ -160,27 +160,33 @@ class Dreamer(nn.Module):
     
     def rollout_policy(self, env, random_policy=False):
         observation, _ = env.reset(seed=self.seed)
+        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
         continue_ = True
         hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
-        latent_state = self.world_model.encoder.encode(hidden_state, observation)
+        latent_state = self.world_model.encoder.encode(hidden_state, observation_tensor)
         for _ in range(self.sequence_length):
             if random_policy:
                 action = env.action_space.sample()
+                action_np = action
             else:
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
-            observation_, reward, terminated, truncated, _ = env.step(action)
+                action_np = action.detach().cpu().numpy().squeeze()
+            observation_, reward, terminated, truncated, _ = env.step(action_np)
+            observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device)
             done = (terminated or truncated)
             continue_ = (1 - done)
             self.buffer.add_to_buffer(observation, action, reward, continue_)
             if done:
                 self.seed += 1
                 observation, _ = env.reset(seed=self.seed)
+                observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
                 continue_ = True
                 hidden_state = torch.zeros(self.hidden_state_dims)
-                latent_state = self.world_model.encoder.encode(hidden_state, observation)
+                latent_state = self.world_model.encoder.encode(hidden_state, observation_tensor)
             else:
-                hidden_state, latent_state = self.world_model.observe_step(latent_state, hidden_state, action, observation_)
+                hidden_state, latent_state = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
                 observation = observation_
+                observation_tensor = observation__tensor
 
     def train_world_model(self):
         loss_list = []
@@ -238,18 +244,22 @@ class Dreamer(nn.Module):
     def evaluate_agent(self, env, eval_episodes):
         reward_list = []
         for _ in tqdm(range(eval_episodes), desc="Evaluating Agent", leave=False):
+            self.seed += 1
             total_reward = 0
             observation, _ = env.reset(seed=self.seed)
+            observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
             continue_ = True
             hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
-            latent_state = self.world_model.encoder.encode(hidden_state, observation)
+            latent_state = self.world_model.encoder.encode(hidden_state, observation_tensor)
             while continue_:
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
-                observation_, reward, terminated, truncated, _ = env.step(action)
+                action_np = action.detach().cpu().numpy().squeeze()
+                observation_, reward, terminated, truncated, _ = env.step(action_np)
+                observation__tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
                 total_reward += reward
                 done = (terminated or truncated)
                 continue_ = (1 - done)
-                hidden_state, latent_state = self.world_model.observe_step(latent_state, hidden_state, action, observation_)
+                hidden_state, latent_state = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
                 observation = observation_
             reward_list.append(total_reward)
         reward_list = torch.stack(reward_list, dim=0)
