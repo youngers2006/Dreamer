@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal
 from DreamerUtils import gaussian_log_probability
+from DreamerUtils import symexp
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(
@@ -34,6 +35,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.lambda_ = lambda_
         self.gamma = gamma
 
+        self.S = 1.0
+        self.smoothing_factor = 0.99
+
         self.actor_optimiser = torch.optim.AdamW(
             params=self.parameters(),
             lr=A_lr,
@@ -46,6 +50,15 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             betas=(C_betas[0], C_betas[1]),
             eps=C_eps
         )
+    
+    def update_S(self, lambda_returns: torch.tensor):
+        flat_returns = lambda_returns.detach().flatten()
+        per095 = torch.quantile(flat_returns, 0.95)
+        per005 = torch.quantile(flat_returns, 0.05)
+
+        range = torch.max(per095 - per005, torch.tensor(1.0, dtype=torch.float32, device=self.device))
+        alpha = (1.0 - self.smoothing_factor)
+        self.S = (1.0 - alpha) * self.S + alpha * range
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
         R_lambda_batch_seq = self.compute_batched_R_lambda_returns(
@@ -61,7 +74,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         a_dist_batch_seq = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
         log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq)
         actor_entropy_batched_seq = a_dist_batch_seq.entropy()
-        loss_batched_seq_actor = log_prob_batch_seq * advantage_batched_seq.detach() + self.nu.detach() * actor_entropy_batched_seq.detach()
+        self.update_S(R_lambda_batch_seq)
+        normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device))
+        loss_batched_seq_actor = log_prob_batch_seq * (advantage_batched_seq.detach() / normalisation_term) + self.nu.detach() * actor_entropy_batched_seq.detach()
         loss_actor = torch.mean(loss_batched_seq_actor, keepdim=False)
         loss_actor *= -1.0
 
@@ -125,23 +140,33 @@ class Actor(nn.Module):
         return action, mu, sigma
 
 class Critic(nn.Module):
-    def __init__(self, latent_row_dim, latent_column_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
+    def __init__(self, latent_row_dim, latent_column_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2, num_buckets=255, device='cpu'):
         super().__init__()
         self.latent_row_dim = latent_row_dim
         self.latent_column_dim = latent_column_dim
+        self.num_buckets = num_buckets
         self.flatten = nn.Flatten()
         self.value_net = nn.Sequential(
             nn.Linear(in_features=latent_column_dim * latent_row_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_num_nodes_1, out_features=hidden_layer_num_nodes_2, device=device),
             nn.SiLU(),
-            nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=1, device=device)
+            nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=num_buckets, device=device)
         )
+        buckets = symexp(torch.linspace(-20, 20, num_buckets, device=device))
+        self.register_buffer('buckets', buckets)
 
     def forward(self, ht, zt):
         flattened_zt = self.flatten(zt)
         st = torch.cat([ht, flattened_zt], dim=-1)
-        return self.value_net(st)
+        logits = self.value_net(st)
+        return logits
+    
+    def predict(self, ht, zt):
+        logits = self.forward(ht, zt)
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+        value = torch.sum(probs * self.buckets, dim=-1, keepdim=True)
+        return value
 
 
 
