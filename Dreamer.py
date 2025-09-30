@@ -20,6 +20,7 @@ class Dreamer(nn.Module):
             beta_prediction,
             beta_dynamics,
             beta_representation,
+            critic_reward_buckets,
             encoder_filter_num_1,
             encoder_filter_num_2,
             encoder_hidden_layer_nodes,
@@ -84,6 +85,7 @@ class Dreamer(nn.Module):
             dyn_pred_hidden_num_nodes_2,
             rew_pred_hidden_num_nodes_1,
             rew_pred_hidden_num_nodes_2,
+            critic_reward_buckets,
             cont_pred_hidden_num_nodes_1,
             cont_pred_hidden_num_nodes_2,
             device=device
@@ -96,6 +98,7 @@ class Dreamer(nn.Module):
             hidden_layer_actor_2_size,
             hidden_layer_critic_1_size,
             hidden_layer_critic_2_size,
+            critic_reward_buckets,
             actor_lr,
             actor_betas,
             actor_eps,

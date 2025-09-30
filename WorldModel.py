@@ -33,6 +33,7 @@ class WorldModel(nn.Module):
             dyn_pred_hidden_num_nodes_2,
             rew_pred_hidden_num_nodes_1, 
             rew_pred_hidden_num_nodes_2, 
+            reward_buckets,
             cont_pred_hidden_num_nodes_1, 
             cont_pred_hidden_num_nodes_2,
             device='cpu'
@@ -43,6 +44,7 @@ class WorldModel(nn.Module):
         self.action_dims = action_dims
         self.observation_dim_x, self.observation_dim_y = observation_dims
         self.horizon = training_horizon
+        self.buckets = reward_buckets
 
         self.optimiser = torch.optim.AdamW(
             self.parameters(), 
@@ -96,7 +98,7 @@ class WorldModel(nn.Module):
                     action_sequence[t-1],
                     observation_sequence[t-1]
                 )
-                reward_th_seq = to_twohot(reward_sequence, buckets)
+                reward_th_seq = to_twohot(reward_sequence, self.buckets)
 
                 prior_latent_logits = self.dynamics_predictor(hidden_state, posterior_latent)
                 dec_mu, dec_sig = self.decoder(hidden_state, posterior_latent)
@@ -123,7 +125,7 @@ class WorldModel(nn.Module):
             return prior_logits, posterior_logits, obs_likelyhood_seq, rew_likelyhood_seq, cont_likelyhood_seq
 
         init_hidden_state_sequence = torch.zeros(self.horizon, self.hidden_dims, dtype=torch.float32, device=self.device)
-        init_latent_state_sequence = torch.zeros(self.horizon, self.latent_dims, dtype=torch.float32, device=self.device)
+        init_latent_state_sequence = torch.zeros(self.horizon, self.latent_num_rows, self.latent_num_columns, dtype=torch.float32, device=self.device)
 
         batched_sequence_unroll = torch.vmap(single_sequence_unroll, in_dims=(0,0,0,0,None,None))
         prior_mu, prior_sigma, posterior_mu, posterior_sigma, obs_log_lh, rew_log_lh, cont_log_lh = batched_sequence_unroll(
