@@ -20,7 +20,6 @@ class DMControlAdapter(gym.Env):
 
         self._env = dm_env
         
-        # Define observation and action spaces from the existing environment
         self.observation_spec = self._env.observation_spec()
         self.observation_space = self._spec_to_box(list(self.observation_spec.values()))
 
