@@ -139,6 +139,7 @@ class Dreamer(nn.Module):
             continues_ = []
             a_mus = []
             a_sigmas = []
+            hidden_state = starting_hidden_state ; latent_state = starting_latent_state
             for _ in range(self.horizon):
                 action, a_mu, a_sigma = self.agent.actor.act(hidden_state, latent_state)
                 hidden_state_, latent_state_, reward, continue_ = self.world_model.imagine_step(hidden_state, latent_state, action)
@@ -294,9 +295,3 @@ class Dreamer(nn.Module):
         eval_reward = self.evaluate_agent(eval_env, eval_episodes=10)
         evaluation_list.append(eval_reward)
         return WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list
-
-        
-        
-
-
-
