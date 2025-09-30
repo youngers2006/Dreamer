@@ -22,7 +22,7 @@ class Buffer:
         self.reward_buffer[self.next_idx] = torch.tensor(reward, dtype=torch.float32, device=self.device)
         self.continue_buffer[self.next_idx] = torch.tensor(continue_, dtype=torch.float32, device=self.device)
 
-        next_idx = (next_idx + 1) % self.capacity
+        self.next_idx = (self.next_idx + 1) % self.capacity
         if self.size < self.capacity:
             self.size = self.size + 1
 
@@ -30,8 +30,8 @@ class Buffer:
         if self.size < self.sequence_length:
             raise ValueError("Not enough data in buffer to sample a full sequence")
         
-        end_index = self.size - self.sequence_length
-        start_index = np.random.randint(0, end_index, size=batch_size)
+        valid_starts_index = self.size - self.sequence_length + 1
+        start_index = np.random.randint(0, valid_starts_index, size=batch_size)
         indices = start_index[:, None] + np.arange(self.sequence_length)[None, :]
 
         observations = self.observation_buffer[indices]
@@ -41,4 +41,3 @@ class Buffer:
         sequence_length = self.sequence_length
 
         return observations, actions, rewards, continues, sequence_length
-

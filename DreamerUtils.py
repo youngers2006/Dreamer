@@ -27,7 +27,7 @@ def symlog(x):
     return torch.sign(x) * torch.log(1.0 + torch.abs(x))
 
 def symexp(x):
-    return torch.sign(x) * torch.exp(1.0 + torch.abs(x))
+    return torch.sign(x) * torch.exp(torch.abs(x) - 1.0)
 
 def to_twohot(value: torch.tensor, buckets: torch.tensor):
     clipped_value = torch.clamp(max=buckets.max(), min=buckets.min(), input=value)
@@ -35,7 +35,7 @@ def to_twohot(value: torch.tensor, buckets: torch.tensor):
     lower_bucket_val = buckets[lower_bucket_idx]
     upper_bucket_val = buckets[lower_bucket_idx + 1]
     weight = (clipped_value - lower_bucket_val) / (upper_bucket_val - lower_bucket_val + 1e-8)
-    twohot_shape = list(value.shape) + list(buckets.shape[-1])
+    twohot_shape = list(value.shape) + [buckets.shape[-1]]
     twohot = torch.zeros(twohot_shape, dtype=torch.float32, device=value.device)
     twohot.scatter_(dim=-1, index=lower_bucket_idx.unsqueeze(-1), src=(1.0 - weight).unsqueeze(-1))
     twohot.scatter_(dim=-1, index=(lower_bucket_idx + 1).unsqueeze(-1), src=weight.unsqueeze(-1))
