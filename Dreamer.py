@@ -5,6 +5,7 @@ from WorldModel import WorldModel
 from Agent import Agent
 from Buffer import Buffer
 from tqdm import tqdm
+from DMAdaptor import DMControlAdaptor
 
 class Dreamer(nn.Module):
     def __init__(
