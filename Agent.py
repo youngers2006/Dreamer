@@ -40,13 +40,13 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.smoothing_factor = 0.99
 
         self.actor_optimiser = torch.optim.AdamW(
-            params=self.parameters(),
+            params=self.actor.parameters(),
             lr=A_lr,
             betas=(A_betas[0], A_betas[1]),
             eps=A_eps
         )
         self.critic_optimiser = torch.optim.AdamW(
-            params=self.parameters(),
+            params=self.critic.parameters(),
             lr=C_lr,
             betas=(C_betas[0], C_betas[1]),
             eps=C_eps
@@ -123,7 +123,7 @@ class Actor(nn.Module):
         self.base_net = nn.Sequential(
             nn.Linear(in_features=latent_row_dim * latent_column_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
             nn.SiLU(),
-            nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=hidden_layer_num_nodes_2, device=device),
+            nn.Linear(in_features=hidden_layer_num_nodes_1, out_features=hidden_layer_num_nodes_2, device=device),
             nn.SiLU()
         )
         self.mu_head = nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=action_dim, device=device)
@@ -135,7 +135,7 @@ class Actor(nn.Module):
         base_result = self.base_net(st)
         mu = self.mu_head(base_result)
         log_sig = self.log_sig_head(base_result)
-        sigma = torch.log(log_sig)
+        sigma = torch.nn.functional.softplus(log_sig) + 1e-4
         return mu, sigma
     
     def act(self, ht, zt):
@@ -149,7 +149,7 @@ class Critic(nn.Module):
         super().__init__()
         self.latent_row_dim = latent_row_dim
         self.latent_column_dim = latent_column_dim
-        self.num_buckets = num_buckets
+        self.buckets = num_buckets
         self.flatten = nn.Flatten()
         self.value_net = nn.Sequential(
             nn.Linear(in_features=latent_column_dim * latent_row_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
@@ -172,6 +172,3 @@ class Critic(nn.Module):
         probs = torch.nn.functional.softmax(logits, dim=-1)
         value = torch.sum(probs * self.buckets, dim=-1, keepdim=True)
         return value
-
-
-

@@ -74,7 +74,7 @@ class WorldModel(nn.Module):
     
     def observe_step(self, last_latent, last_hidden, last_action, observation) -> tuple[torch.tensor, torch.tensor, torch.tensor]:
         hidden_state = self.sequence_model.forward(last_latent, last_hidden, last_action)
-        latent_state, latent_logits = self.encoder.encode(observation, hidden_state)
+        latent_state, latent_logits = self.encoder.encode(hidden_state, observation)
         return latent_state, hidden_state, latent_logits
     
     def unroll_model(
