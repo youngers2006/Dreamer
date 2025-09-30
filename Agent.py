@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
-from DreamerUtils import gaussian_log_probability
-from DreamerUtils import symexp
+from DreamerUtils import symexp, to_twohot
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(
@@ -68,20 +67,23 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 continue_batch_seq,
                 continue_batch_seq.shape[1]
             )
-        value_batched_seq = self.critic.forward(z_batch_seq, h_batch_seq)
-        advantage_batched_seq = R_lambda_batch_seq - value_batched_seq
+        with torch.no_grad():
+            value_batched_seq = self.critic.value(z_batch_seq, h_batch_seq)
+            advantage_batched_seq = R_lambda_batch_seq - value_batched_seq
 
         a_dist_batch_seq = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
         log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq)
         actor_entropy_batched_seq = a_dist_batch_seq.entropy()
         self.update_S(R_lambda_batch_seq)
         normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device))
-        loss_batched_seq_actor = log_prob_batch_seq * (advantage_batched_seq.detach() / normalisation_term) + self.nu.detach() * actor_entropy_batched_seq.detach()
-        loss_actor = torch.mean(loss_batched_seq_actor, keepdim=False)
-        loss_actor *= -1.0
+        loss_batched_seq_actor = log_prob_batch_seq * (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
+        loss_actor = -torch.sum(loss_batched_seq_actor, keepdim=False, dim=1).mean()
 
-        loss_batched_seq_critic = (0.5) * torch.square(value_batched_seq - R_lambda_batch_seq.detach())
-        loss_critic = torch.mean(loss_batched_seq_critic, keepdim=False)
+        critic_logits = self.critic(h_batch_seq, z_batch_seq)
+        R_lambda_th_batch_seq = to_twohot(R_lambda_batch_seq, self.buckets)
+        value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
+        loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
+        loss_critic = torch.mean(loss_batched_seq_critic)
 
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
@@ -94,7 +96,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
         def compute_R_lambda_returns(hidden_state_seq, latent_state_seq, reward_seq, continue_seq, seq_length):
-            value_estimate_seq = self.critic(hidden_state_seq, latent_state_seq).detach()
+            with torch.no_grad():
+                value_estimate_seq = self.critic.value(hidden_state_seq, latent_state_seq).detach()
             R_lambda_seq = [value_estimate_seq[-1]]
             for t in reversed(range(seq_length-1)):
                 R_lambda = reward_seq[t] + self.gamma * continue_seq[t] * ((1 - self.lambda_) * value_estimate_seq[t+1] + self.lambda_ * R_lambda_seq[0])
@@ -112,7 +115,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         return R_lambda_batched_seq
         
 class Actor(nn.Module):
-    def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
+    def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, discrete=True, device='cpu'):
         super().__init__()
         self.flatten = nn.Flatten()
         self.base_net = nn.Sequential(
@@ -162,7 +165,7 @@ class Critic(nn.Module):
         logits = self.value_net(st)
         return logits
     
-    def predict(self, ht, zt):
+    def value(self, ht, zt):
         logits = self.forward(ht, zt)
         probs = torch.nn.functional.softmax(logits, dim=-1)
         value = torch.sum(probs * self.buckets, dim=-1, keepdim=True)

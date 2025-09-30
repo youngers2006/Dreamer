@@ -6,7 +6,7 @@ from SequenceModel import SequenceModel
 import torch.distributions as distributions
 from torch.distributions import Normal, Bernoulli
 import torch.optim as optim
-from DreamerUtils import gaussian_log_probability, kullback_leibler_divergence_between_gaussians, bernoulli_log_probability
+from DreamerUtils import gaussian_log_probability, to_twohot, bernoulli_log_probability
 
 class WorldModel(nn.Module):
     def __init__(
@@ -96,14 +96,17 @@ class WorldModel(nn.Module):
                     action_sequence[t-1],
                     observation_sequence[t-1]
                 )
+                reward_th_seq = to_twohot(reward_sequence, buckets)
+
                 prior_latent_logits = self.dynamics_predictor(hidden_state, posterior_latent)
                 dec_mu, dec_sig = self.decoder(hidden_state, posterior_latent)
-                rew_mu, rew_sig = self.reward_predictor(hidden_state, posterior_latent) 
+                rew_logits = self.reward_predictor(hidden_state, posterior_latent) 
                 cont_prob, _ = self.continue_predictor(hidden_state, posterior_latent)
 
                 observation_log_likelyhood = gaussian_log_probability(observation_sequence[t], dec_mu, dec_sig).sum()
-                reward_log_likelyhood = gaussian_log_probability(reward_sequence[t], rew_mu, rew_sig)
                 continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[t])
+                reward_log_probs = torch.nn.functional.log_softmax(rew_logits, dim=-1)
+                reward_log_likelyhood = -torch.sum(reward_th_seq * reward_log_probs)
 
                 posterior_logits.append(posterior_latent_logits)
                 prior_logits.append(prior_latent_logits)
