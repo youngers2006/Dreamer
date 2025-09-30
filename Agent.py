@@ -117,7 +117,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         return R_lambda_batched_seq
         
 class Actor(nn.Module):
-    def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, discrete=True, device='cpu'):
+    def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
         super().__init__()
         self.flatten = nn.Flatten()
         self.base_net = nn.Sequential(

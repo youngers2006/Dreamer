@@ -165,9 +165,9 @@ class Dreamer(nn.Module):
     
     def rollout_policy(self, env, random_policy=False):
         observation, _ = env.reset(seed=self.seed)
-        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
+        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
         continue_ = True
-        hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
+        hidden_state = torch.zeros(1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
         latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
         for _ in range(self.sequence_length):
             if random_policy:
@@ -180,7 +180,7 @@ class Dreamer(nn.Module):
             observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device)
             done = (terminated or truncated)
             continue_ = (1 - done)
-            self.buffer.add_to_buffer(observation, action, reward, continue_)
+            self.buffer.add_to_buffer(observation, action_np, reward, continue_)
             if done:
                 self.seed += 1
                 observation, _ = env.reset(seed=self.seed)
@@ -260,7 +260,7 @@ class Dreamer(nn.Module):
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
                 action_np = action.detach().cpu().numpy().squeeze()
                 observation_, reward, terminated, truncated, _ = env.step(action_np)
-                observation__tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
+                observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device)
                 total_reward += reward
                 done = (terminated or truncated)
                 continue_ = (1 - done)
