@@ -21,7 +21,7 @@ class DynamicsPredictor(nn.Module):
         )
 
     def forward(self, x):
-        logits = self.base_network(x)
+        logits = self.logit_net(x)
         return logits
     
     def predict(self, hidden_state: torch.tensor):
@@ -39,7 +39,7 @@ class RewardPredictor(nn.Module):
     def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, num_buckets=255, device='cpu'):
         super().__init__()
         self.latent_size = latent_num_rows * latent_num_columns
-        self.num_buckets = num_buckets
+        self.buckets = num_buckets
         self.device = device
         self.flatten = nn.Flatten()
         self.logit_net = nn.Sequential(
@@ -52,16 +52,14 @@ class RewardPredictor(nn.Module):
         buckets = symexp(torch.linspace(-20.0, 20.0, num_buckets, device=device))
         self.register_buffer('buckets', buckets)
         
-    def forward(self, x1, x2):
-        x2 = self.flatten(x2)
-        x = torch.cat([x1, x2], dim=-1)
-        logits = self.logit_net(x)
+    def forward(self, hidden, latent):
+        latent = self.flatten(latent)
+        input = torch.cat([hidden, latent], dim=-1)
+        logits = self.logit_net(input)
         return logits
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
-        latent_state = self.flatten(latent_state)
-        state = torch.cat(hidden_state, latent_state)
-        logits = self.forward(state)
+        logits = self.forward(hidden_state, latent_state)
         probs = torch.nn.functional.softmax(logits, dim=-1)
         reward = torch.sum(probs * self.buckets, dim=-1, keepdim=True)
         return reward
@@ -83,14 +81,15 @@ class ContinuePredictor(nn.Module):
             nn.Linear(in_features=hidden_L2, out_features=1, device=device)
         )
 
-    def forward(self, x):
-        logit = self.logit_generator(x)
+    def forward(self, hidden, latent):
+        latent = self.flatten(latent)
+        input = torch.cat([hidden, latent], dim=-1)
+        logit = self.logit_generator(input)
         probability = torch.sigmoid(logit)
         return probability, logit
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
         latent_state = self.flatten(latent_state)
-        state = torch.cat(hidden_state, latent_state)
-        probability, _ = self.forward(state)
-        continue_ = (probability <= 0.05)
+        probability, _ = self.forward(hidden_state, latent_state)
+        continue_ = (probability >= 0.05)
         return continue_
