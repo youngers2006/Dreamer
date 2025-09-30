@@ -33,7 +33,7 @@ class DynamicsPredictor(nn.Module):
         return latent_state, logits
     
 class RewardPredictor(nn.Module):
-    """
+    """ 
     Takes the current hidden state of the sequence model and the latent state and predicts the reward
     """
     def __init__(self, latent_num_rows, latent_num_columns, hidden_state_size, hidden_L1, hidden_L2, num_buckets=255, device='cpu'):
@@ -50,7 +50,7 @@ class RewardPredictor(nn.Module):
             nn.Linear(in_features=hidden_L2, out_features=num_buckets, device=device)
         )
         buckets = symexp(torch.linspace(-20.0, 20.0, num_buckets, device=device))
-        self.register_buffer('buckets', buckets)
+        self.register_buffer('buckets_rew', buckets)
         
     def forward(self, hidden, latent):
         latent = self.flatten(latent)
@@ -61,7 +61,7 @@ class RewardPredictor(nn.Module):
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
         logits = self.forward(hidden_state, latent_state)
         probs = torch.nn.functional.softmax(logits, dim=-1)
-        reward = torch.sum(probs * self.buckets, dim=-1, keepdim=True)
+        reward = torch.sum(probs * self.buckets_rew, dim=-1, keepdim=True)
         return reward
     
 class ContinuePredictor(nn.Module):

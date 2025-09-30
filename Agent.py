@@ -159,7 +159,7 @@ class Critic(nn.Module):
             nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=num_buckets, device=device)
         )
         bucket_values = symexp(torch.linspace(-20, 20, num_buckets, device=device))
-        self.register_buffer('bucket_values', bucket_values)
+        self.register_buffer('buckets_crit', bucket_values)
 
     def forward(self, ht, zt):
         flattened_zt = self.flatten(zt)
@@ -170,5 +170,5 @@ class Critic(nn.Module):
     def value(self, ht, zt):
         logits = self.forward(ht, zt)
         probs = torch.nn.functional.softmax(logits, dim=-1)
-        value = torch.sum(probs * self.bucket_values, dim=-1, keepdim=True)
+        value = torch.sum(probs * self.buckets_crit, dim=-1, keepdim=True)
         return value

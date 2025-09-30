@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class Encoder(nn.Module):
+class Encoder(nn.Module): 
     def __init__(self, hidden_state_dim, latent_num_rows, latent_num_columns, num_filters_1, num_filters_2, hidden_layer_nodes, device='cpu'):
         """
         Takes obseravtion (image in this class) and maps it to a latent state representation through a CNN.
