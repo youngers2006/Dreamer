@@ -149,7 +149,7 @@ class Critic(nn.Module):
         super().__init__()
         self.latent_row_dim = latent_row_dim
         self.latent_column_dim = latent_column_dim
-        self.buckets = num_buckets
+        self.num_buckets = num_buckets
         self.flatten = nn.Flatten()
         self.value_net = nn.Sequential(
             nn.Linear(in_features=latent_column_dim * latent_row_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
@@ -158,8 +158,8 @@ class Critic(nn.Module):
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=num_buckets, device=device)
         )
-        buckets = symexp(torch.linspace(-20, 20, num_buckets, device=device))
-        self.register_buffer('buckets', buckets)
+        bucket_values = symexp(torch.linspace(-20, 20, num_buckets, device=device))
+        self.register_buffer('bucket_values', bucket_values)
 
     def forward(self, ht, zt):
         flattened_zt = self.flatten(zt)
@@ -170,5 +170,5 @@ class Critic(nn.Module):
     def value(self, ht, zt):
         logits = self.forward(ht, zt)
         probs = torch.nn.functional.softmax(logits, dim=-1)
-        value = torch.sum(probs * self.buckets, dim=-1, keepdim=True)
+        value = torch.sum(probs * self.bucket_values, dim=-1, keepdim=True)
         return value

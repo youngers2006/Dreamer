@@ -46,24 +46,25 @@ class WorldModel(nn.Module):
         self.horizon = training_horizon
         self.buckets = reward_buckets
 
+        self.beta_pred = beta_pred
+        self.beta_dyn = beta_dyn
+        self.beta_rep = beta_rep
+        self.batch_size = batch_size
+
+        self.encoder = Encoder(hidden_dims, latent_dims[0], latent_dims[1], num_encoder_filters_1, num_encoder_filters_2, encoder_hidden_layer_nodes, device=device)
+        self.sequence_model = SequenceModel(latent_dims[0], latent_dims[1], hidden_dims, action_dims, num_layers=1, device=device)
+        self.dynamics_predictor = DynamicsPredictor(latent_dims[0], latent_dims[1], hidden_dims, dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, device)
+        self.reward_predictor = RewardPredictor(latent_dims[0], latent_dims[1], hidden_dims, rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2, reward_buckets, device=device)
+        self.continue_predictor = ContinuePredictor(latent_dims[0], latent_dims[1], hidden_dims, cont_pred_hidden_num_nodes_1, cont_pred_hidden_num_nodes_2, device=device)
+        self.decoder = Decoder(latent_dims[0], latent_dims[1], observation_dims, hidden_dims, num_decoder_filters_1, num_decoder_filters_2, decoder_hidden_layer_nodes, device=device)
+        self.device = device
+
         self.optimiser = torch.optim.AdamW(
             self.parameters(), 
             lr=WM_lr, 
             betas=(WM_betas[0], WM_betas[1]), 
             eps=WM_eps
         )
-        self.beta_pred = beta_pred
-        self.beta_dyn = beta_dyn
-        self.beta_rep = beta_rep
-        self.batch_size = batch_size
-
-        self.encoder = Encoder(latent_dims, num_encoder_filters_1, num_encoder_filters_2, encoder_hidden_layer_nodes, device=device)
-        self.sequence_model = SequenceModel(latent_dims, hidden_dims, action_dims, num_layers=1, device=device)
-        self.dynamics_predictor = DynamicsPredictor(latent_dims, hidden_dims, dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, device)
-        self.reward_predictor = RewardPredictor(latent_dims, hidden_dims, rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2, device=device)
-        self.continue_predictor = ContinuePredictor(latent_dims, hidden_dims, cont_pred_hidden_num_nodes_1, cont_pred_hidden_num_nodes_2, device=device)
-        self.decoder = Decoder(latent_dims, observation_dims, hidden_dims, num_decoder_filters_1, num_decoder_filters_2, decoder_hidden_layer_nodes, device=device)
-        self.device = device
 
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
