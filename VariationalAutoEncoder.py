@@ -18,7 +18,7 @@ class Encoder(nn.Module):
             nn.SiLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.AdaptiveAvgPool2d((2, 2))
-        )
+        ) 
         flattened_feature_size = num_filters_2 * 2 * 2
         total_in_features = flattened_feature_size + hidden_state_dim
         self.flatten = nn.Flatten()

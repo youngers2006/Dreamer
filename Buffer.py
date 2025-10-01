@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 class Buffer:
-    def __init__(self, buffer_size, sequence_length, action_size, observation_dims):
+    def __init__(self, buffer_size, sequence_length, action_size, observation_dims, device='cpu'):
         self.observation_buffer = np.zeros((buffer_size, *observation_dims), dtype=np.uint8)
         self.action_buffer = np.zeros((buffer_size, action_size), dtype=np.float32)
         self.reward_buffer = np.zeros((buffer_size, 1), dtype=np.float32)
@@ -10,6 +10,7 @@ class Buffer:
 
         self.capacity = buffer_size
         self.sequence_length = sequence_length
+        self.device = device
 
         self.next_idx = 0
         self.size = 0
@@ -37,5 +38,11 @@ class Buffer:
         rewards = self.reward_buffer[indices]
         continues = self.continue_buffer[indices]
         sequence_length = self.sequence_length
+
+        observations = torch.tensor(observations, dtype=torch.float32, device=self.device)
+        actions = torch.tensor(actions, dtype=torch.float32, device=self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
+        continues = torch.tensor(continues, dtype=torch.float32, device=self.device)
+        sequence_length = torch.tensor(sequence_length, dtype=torch.float32, device=self.device)
 
         return observations, actions, rewards, continues, sequence_length

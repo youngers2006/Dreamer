@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 from WorldModel import WorldModel
 from Agent import Agent
 from Buffer import Buffer
@@ -114,7 +115,8 @@ class Dreamer(nn.Module):
             buffer_size,
             sequence_length,
             action_dims,
-            observation_dims
+            observation_dims,
+            device=device
         )
         self.horizon = horizon
         self.batch_size = batch_size
@@ -164,6 +166,7 @@ class Dreamer(nn.Module):
     
     def rollout_policy(self, env, random_policy=False):
         observation, _ = env.reset(seed=self.seed)
+        observation = observation.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
         observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
         continue_ = True
         hidden_state = torch.zeros(1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
@@ -176,6 +179,7 @@ class Dreamer(nn.Module):
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
                 action_np = action.detach().cpu().numpy().squeeze()
             observation_, reward, terminated, truncated, _ = env.step(action_np)
+            observation_ = observation_.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
             observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device)
             done = (terminated or truncated)
             continue_ = (1 - done)
@@ -183,6 +187,7 @@ class Dreamer(nn.Module):
             if done:
                 self.seed += 1
                 observation, _ = env.reset(seed=self.seed)
+                observation = observation.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
                 observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
                 continue_ = True
                 hidden_state = torch.zeros(self.hidden_state_dims)
@@ -195,11 +200,9 @@ class Dreamer(nn.Module):
     def train_world_model(self):
         loss_list = []
         for _ in tqdm(range(self.WM_epochs), desc="Training World Model On Buffer Data", leave=False):
-            # must convert to tensors
             observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch, _ = self.buffer.sample_sequences(
                 batch_size=self.batch_size
             )
-            # convert here
             loss_world_model = self.world_model.training_step(observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch)
             loss_list.append(loss_world_model)
         return loss_list
@@ -253,6 +256,7 @@ class Dreamer(nn.Module):
             self.seed += 1
             total_reward = 0
             observation, _ = env.reset(seed=self.seed)
+            observation = observation.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
             observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
             continue_ = True
             hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device)
@@ -261,6 +265,7 @@ class Dreamer(nn.Module):
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
                 action_np = action.detach().cpu().numpy().squeeze()
                 observation_, reward, terminated, truncated, _ = env.step(action_np)
+                observation_ = observation_.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
                 observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device)
                 total_reward += reward
                 done = (terminated or truncated)
