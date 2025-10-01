@@ -2,11 +2,11 @@ import torch
 import numpy as np
 
 class Buffer:
-    def __init__(self, buffer_size, sequence_length, action_size, observation_dims, device='cpu'):
-        self.observation_buffer = torch.zeros((buffer_size, *observation_dims), dtype=torch.float32, device=device)
-        self.action_buffer = torch.zeros((buffer_size, action_size), dtype=torch.float32, device=device)
-        self.reward_buffer = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
-        self.continue_buffer = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
+    def __init__(self, buffer_size, sequence_length, action_size, observation_dims):
+        self.observation_buffer = np.zeros((buffer_size, *observation_dims), dtype=np.uint8)
+        self.action_buffer = np.zeros((buffer_size, action_size), dtype=np.float32)
+        self.reward_buffer = np.zeros((buffer_size, 1), dtype=np.float32)
+        self.continue_buffer = np.zeros((buffer_size, 1), dtype=np.float32)
 
         self.capacity = buffer_size
         self.sequence_length = sequence_length
@@ -14,13 +14,11 @@ class Buffer:
         self.next_idx = 0
         self.size = 0
 
-        self.device = device
-
     def add_to_buffer(self, observation, action, reward, continue_):
-        self.observation_buffer[self.next_idx] = torch.tensor(observation, dtype=torch.float32, device=self.device)
-        self.action_buffer[self.next_idx] = torch.tensor(action, dtype=torch.float32, device=self.device)
-        self.reward_buffer[self.next_idx] = torch.tensor(reward, dtype=torch.float32, device=self.device)
-        self.continue_buffer[self.next_idx] = torch.tensor(continue_, dtype=torch.float32, device=self.device)
+        self.observation_buffer[self.next_idx] = np.array(observation, dtype=np.uint8)
+        self.action_buffer[self.next_idx] = np.array(action, dtype=np.float32)
+        self.reward_buffer[self.next_idx] = np.array(reward, dtype=np.float32)
+        self.continue_buffer[self.next_idx] = np.array(continue_, dtype=np.float32)
 
         self.next_idx = (self.next_idx + 1) % self.capacity
         if self.size < self.capacity:

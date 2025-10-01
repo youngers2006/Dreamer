@@ -114,8 +114,7 @@ class Dreamer(nn.Module):
             buffer_size,
             sequence_length,
             action_dims,
-            observation_dims,
-            device=device
+            observation_dims
         )
         self.horizon = horizon
         self.batch_size = batch_size
@@ -196,9 +195,11 @@ class Dreamer(nn.Module):
     def train_world_model(self):
         loss_list = []
         for _ in tqdm(range(self.WM_epochs), desc="Training World Model On Buffer Data", leave=False):
+            # must convert to tensors
             observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch, _ = self.buffer.sample_sequences(
                 batch_size=self.batch_size
             )
+            # convert here
             loss_world_model = self.world_model.training_step(observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch)
             loss_list.append(loss_world_model)
         return loss_list
