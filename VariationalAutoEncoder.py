@@ -29,19 +29,28 @@ class Encoder(nn.Module):
         )
 
     def forward(self, hidden, latent):
+        hidden = hidden[-1]
         features = self.feature_extractor(latent)
         features = self.flatten(features)
+
+        # Ensure both tensors are 2D before concatenation
+        if features.dim() == 1:
+            features = features.unsqueeze(0)
+        if hidden.dim() == 1:
+            hidden = hidden.unsqueeze(0)
+        
         input = torch.cat((features, hidden), dim=-1)
         logits = self.latent_mapper(input)
         return logits
     
     def encode(self, hidden_state, observation):
         logits = self.forward(hidden_state, observation)
+        logits_reshaped = logits_reshaped.view(-1, self.latent_num_rows, self.latent_num_columns)
         dist = torch.distributions.Categorical(logits=logits)
         sampled_idx = dist.sample()
         latent_state_flat = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_size)
         latent_state = latent_state_flat.view(-1, self.latent_num_rows, self.latent_num_columns)
-        return latent_state, logits
+        return latent_state, logits_reshaped
 
 class Decoder(nn.Module):
     """
@@ -67,6 +76,7 @@ class Decoder(nn.Module):
         self.softplus = nn.Softplus()
 
     def forward(self, hidden: torch.tensor, latent: torch.tensor):
+        # hidden = hidden.squeeze(0)
         latent = self.flatten(latent)
         input = torch.cat((hidden, latent), dim=-1)
         x = self.upscaler(input)

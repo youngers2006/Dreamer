@@ -67,7 +67,7 @@ class WorldModel(nn.Module):
         )
 
     def imagine_step(self, hidden_state, latent_state, action):
-        next_hidden_state = self.sequence_model(hidden_state, latent_state, action)
+        next_hidden_state = self.sequence_model(latent_state, hidden_state, action)
         next_latent_state, _ = self.dynamics_predictor.predict(next_hidden_state)
         next_reward = self.reward_predictor.predict(next_hidden_state, next_latent_state)
         continue_ = self.continue_predictor.predict(next_hidden_state, next_latent_state)
