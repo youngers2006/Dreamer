@@ -167,7 +167,7 @@ class Dreamer(nn.Module):
     def rollout_policy(self, env, random_policy=False):
         observation, _ = env.reset(seed=self.seed)
         observation = observation.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
-        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
         continue_ = True
         hidden_state = torch.zeros(1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
         latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
@@ -272,6 +272,7 @@ class Dreamer(nn.Module):
                 continue_ = (1 - done)
                 hidden_state, latent_state, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
                 observation = observation_
+                observation_tensor = observation__tensor
             reward_list.append(total_reward)
         reward_list = torch.stack(reward_list, dim=0)
         return reward_list.mean(dim=0)
