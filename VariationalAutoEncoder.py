@@ -59,11 +59,9 @@ class Decoder(nn.Module):
         super().__init__()
         self.upscale_starting_dim = observation_dim[0] // 4
         self.num_filters_2 = num_filters_2
-
         self.hidden_dim = hidden_state_dim
         self.latent_row_dim = latent_num_rows
         self.latent_col_dim = latent_num_columns
-
         self.flatten = nn.Flatten(start_dim=1)
         self.upscaler = nn.Sequential(
             nn.Linear(in_features=latent_num_rows * latent_num_columns + hidden_state_dim, out_features=hidden_layer_nodes, device=device),
