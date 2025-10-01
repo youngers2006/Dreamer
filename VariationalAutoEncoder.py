@@ -21,35 +21,34 @@ class Encoder(nn.Module):
         ) 
         flattened_feature_size = num_filters_2 * 2 * 2
         total_in_features = flattened_feature_size + hidden_state_dim
-        self.flatten = nn.Flatten()
+        self.flatten = nn.Flatten(start_dim=2)
         self.latent_mapper = nn.Sequential(
             nn.Linear(in_features=total_in_features, out_features=hidden_layer_nodes, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
         )
 
-    def forward(self, hidden, latent):
-        hidden = hidden[-1]
-        features = self.feature_extractor(latent)
+    def forward(self, hidden, observation):
+        B, S, C, H, W = observation.shape
+        observation = observation.view(B * S, C, H, W)
+        features = self.feature_extractor(observation)
+        _, out_C, out_H, out_W = features.shape
+        features = features.view(B, S, out_C, out_H, out_W)
         features = self.flatten(features)
-
-        # Ensure both tensors are 2D before concatenation
-        if features.dim() == 1:
-            features = features.unsqueeze(0)
-        if hidden.dim() == 1:
-            hidden = hidden.unsqueeze(0)
-        
+        print(features.shape)
+        print(hidden.shape)
         input = torch.cat((features, hidden), dim=-1)
         logits = self.latent_mapper(input)
         return logits
     
     def encode(self, hidden_state, observation):
+        B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state, observation)
-        logits_reshaped = logits_reshaped.view(-1, self.latent_num_rows, self.latent_num_columns)
+        logits_reshaped = logits.view(B, S, self.latent_num_rows, self.latent_num_columns)
         dist = torch.distributions.Categorical(logits=logits)
         sampled_idx = dist.sample()
         latent_state_flat = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_size)
-        latent_state = latent_state_flat.view(-1, self.latent_num_rows, self.latent_num_columns)
+        latent_state = latent_state_flat.view(B, S, self.latent_num_rows, self.latent_num_columns)
         return latent_state, logits_reshaped
 
 class Decoder(nn.Module):
@@ -61,7 +60,11 @@ class Decoder(nn.Module):
         self.upscale_starting_dim = observation_dim[0] // 4
         self.num_filters_2 = num_filters_2
 
-        self.flatten = nn.Flatten()
+        self.hidden_dim = hidden_state_dim
+        self.latent_row_dim = latent_num_rows
+        self.latent_col_dim = latent_num_columns
+
+        self.flatten = nn.Flatten(start_dim=1)
         self.upscaler = nn.Sequential(
             nn.Linear(in_features=latent_num_rows * latent_num_columns + hidden_state_dim, out_features=hidden_layer_nodes, device=device),
             nn.SiLU(),
@@ -76,7 +79,9 @@ class Decoder(nn.Module):
         self.softplus = nn.Softplus()
 
     def forward(self, hidden: torch.tensor, latent: torch.tensor):
-        # hidden = hidden.squeeze(0)
+        B, S, _ = hidden.shape
+        hidden = hidden.view(B * S, self.hidden_dim)
+        latent = latent.view(B * S, self.latent_row_dim, self.latent_col_dim)
         latent = self.flatten(latent)
         input = torch.cat((hidden, latent), dim=-1)
         x = self.upscaler(input)
@@ -84,6 +89,9 @@ class Decoder(nn.Module):
         obs_params = self.image_builder(x)
         mu, sigma_logits = torch.chunk(obs_params, chunks=2, dim=1)
         sigma = self.softplus(sigma_logits) + 1e-4
+        _, C, H, W = mu.shape
+        mu = mu.view(B, S, C, H, W)
+        sigma = sigma.view(B, S, C, H, W)
         return mu, sigma
     
     def decode(self, hidden_state: torch.tensor, latent_state: torch.tensor):
