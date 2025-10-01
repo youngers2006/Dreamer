@@ -173,8 +173,8 @@ class Dreamer(nn.Module):
         latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
         for _ in range(self.sequence_length):
             if random_policy:
-                action = env.action_space.sample()
-                action_np = action
+                action_np = env.action_space.sample()
+                action = torch.tensor(action_np, dtype=torch.float32, device=self.device)
             else:
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
                 action_np = action.detach().cpu().numpy().squeeze()
