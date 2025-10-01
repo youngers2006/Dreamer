@@ -3,7 +3,7 @@ import numpy as np
 
 class Buffer:
     def __init__(self, buffer_size, sequence_length, action_size, observation_dims, device='cpu'):
-        self.observation_buffer = np.zeros((buffer_size, *observation_dims), dtype=np.uint8)
+        self.observation_buffer = np.zeros((buffer_size, 3, *observation_dims), dtype=np.uint8)
         self.action_buffer = np.zeros((buffer_size, action_size), dtype=np.float32)
         self.reward_buffer = np.zeros((buffer_size, 1), dtype=np.float32)
         self.continue_buffer = np.zeros((buffer_size, 1), dtype=np.float32)
