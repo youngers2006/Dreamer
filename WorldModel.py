@@ -92,17 +92,16 @@ class WorldModel(nn.Module):
             rew_likelyhood_seq = [] 
             cont_likelyhood_seq = []
 
-            S, _ = reward_sequence.shape
             observation_sequence = observation_sequence.unsqueeze(0)
             action_sequence = action_sequence.unsqueeze(0)
             reward_sequence = reward_sequence.unsqueeze(0)
             continue_sequence = continue_sequence.unsqueeze(0)
 
-            hidden_state = torch.zeros(1, S, self.hidden_dims, device=self.device)
-            posterior_latent, posterior_logits_t = self.encoder.encode(hidden_state[0], observation_sequence[0])
+            hidden_state = torch.zeros(1, 1, self.hidden_dims, device=self.device)
+            posterior_latent = torch.zeros(1, 1, self.latent_num_rows, self.latent_num_columns, device=self.device)
 
             for t in range(self.horizon):
-                prev_action = action_sequence[:, t-1] if t > 0 else torch.zeros(self.action_dims, device=self.device)
+                prev_action = action_sequence[:, t-1] if t > 0 else torch.zeros(1, 1, self.action_dims, device=self.device)
                 posterior_latent, hidden_state, posterior_logits_t = self.observe_step(
                     posterior_latent,
                     hidden_state,
