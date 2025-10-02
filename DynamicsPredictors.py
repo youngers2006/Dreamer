@@ -25,11 +25,12 @@ class DynamicsPredictor(nn.Module):
         return logits
     
     def predict(self, hidden_state: torch.tensor):
+        B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state)
         dist = torch.distributions.Categorical(logits=logits)
         sample_idx = dist.sample()
         latent_state_flat = torch.nn.functional.one_hot(sample_idx, num_classes=self.latent_size)
-        latent_state = latent_state_flat.view(-1, self.latent_num_rows, self.latent_num_columns, dtype=torch.float32)
+        latent_state = latent_state_flat.view(B, S, self.latent_num_rows, self.latent_num_columns)
         return latent_state, logits
     
 class RewardPredictor(nn.Module):
@@ -41,7 +42,7 @@ class RewardPredictor(nn.Module):
         self.latent_size = latent_num_rows * latent_num_columns
         self.buckets = num_buckets
         self.device = device
-        self.flatten = nn.Flatten()
+        self.flatten = nn.Flatten(start_dim=2)
         self.logit_net = nn.Sequential(
             nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
             nn.SiLU(),
@@ -51,7 +52,7 @@ class RewardPredictor(nn.Module):
         )
         buckets = symexp(torch.linspace(-20.0, 20.0, num_buckets, device=device))
         self.register_buffer('buckets_rew', buckets)
-        
+    
     def forward(self, hidden, latent):
         latent = self.flatten(latent)
         input = torch.cat([hidden, latent], dim=-1)
@@ -72,7 +73,7 @@ class ContinuePredictor(nn.Module):
         super().__init__()
         self.latent_size = latent_num_rows * latent_num_columns
         self.device = device
-        self.flatten = nn.Flatten()
+        self.flatten = nn.Flatten(start_dim=2)
         self.logit_generator = nn.Sequential(
             nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
             nn.SiLU(),

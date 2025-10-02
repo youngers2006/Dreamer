@@ -92,26 +92,32 @@ class WorldModel(nn.Module):
             rew_likelyhood_seq = [] 
             cont_likelyhood_seq = []
 
-            hidden_state = torch.zeros(self.hidden_dims, device=self.device)
-            posterior_latent, posterior_logits_t = self.encoder.encode(hidden_state, observation_sequence[0])
+            S, _ = reward_sequence.shape
+            observation_sequence = observation_sequence.unsqueeze(0)
+            action_sequence = action_sequence.unsqueeze(0)
+            reward_sequence = reward_sequence.unsqueeze(0)
+            continue_sequence = continue_sequence.unsqueeze(0)
+
+            hidden_state = torch.zeros(1, S, self.hidden_dims, device=self.device)
+            posterior_latent, posterior_logits_t = self.encoder.encode(hidden_state[0], observation_sequence[0])
 
             for t in range(self.horizon):
-                prev_action = action_sequence[t-1] if t > 0 else torch.zeros(self.action_dims, device=self.device)
+                prev_action = action_sequence[:, t-1] if t > 0 else torch.zeros(self.action_dims, device=self.device)
                 posterior_latent, hidden_state, posterior_logits_t = self.observe_step(
                     posterior_latent,
                     hidden_state,
                     prev_action,
-                    observation_sequence[t]
+                    observation_sequence[:, t]
                 )
-                reward_th = to_twohot(reward_sequence[t], self.buckets)
+                reward_th = to_twohot(reward_sequence[:, t], self.buckets)
 
                 prior_latent_logits = self.dynamics_predictor(hidden_state)
                 dec_mu, dec_sig = self.decoder(hidden_state, posterior_latent)
                 rew_logits = self.reward_predictor(hidden_state, posterior_latent) 
                 cont_prob, _ = self.continue_predictor(hidden_state, posterior_latent)
 
-                observation_log_likelyhood = gaussian_log_probability(observation_sequence[t], dec_mu, dec_sig).sum()
-                continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[t])
+                observation_log_likelyhood = gaussian_log_probability(observation_sequence[:, t], dec_mu, dec_sig).sum()
+                continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[:, t])
                 reward_log_probs = torch.nn.functional.log_softmax(rew_logits, dim=-1)
                 reward_log_likelyhood = torch.sum(reward_th * reward_log_probs)
 
@@ -121,13 +127,19 @@ class WorldModel(nn.Module):
                 rew_likelyhood_seq.append(reward_log_likelyhood)
                 cont_likelyhood_seq.append(continue_log_likelyhood)
             
-            prior_logits = torch.stack(prior_logits, dim=0)
-            posterior_logits = torch.stack(posterior_logits, dim=0)
-            obs_likelyhood_seq = torch.stack(obs_likelyhood_seq, dim=0)
-            rew_likelyhood_seq = torch.stack(rew_likelyhood_seq, dim=0)
-            cont_likelyhood_seq = torch.stack(cont_likelyhood_seq, dim=0)
+            prior_logits = torch.stack(prior_logits, dim=1)
+            posterior_logits = torch.stack(posterior_logits, dim=1)
+            obs_likelyhood_seq = torch.stack(obs_likelyhood_seq, dim=1)
+            rew_likelyhood_seq = torch.stack(rew_likelyhood_seq, dim=1)
+            cont_likelyhood_seq = torch.stack(cont_likelyhood_seq, dim=1)
             
-            return prior_logits, posterior_logits, obs_likelyhood_seq, rew_likelyhood_seq, cont_likelyhood_seq
+            return (
+                prior_logits.squeeze(0), 
+                posterior_logits.squeeze(0), 
+                obs_likelyhood_seq.squeeze(0), 
+                rew_likelyhood_seq.squeeze(0), 
+                cont_likelyhood_seq.squeeze(0)
+            )
 
         batched_sequence_unroll = torch.vmap(single_sequence_unroll, in_dims=(0,0,0,0))
         prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = batched_sequence_unroll(
@@ -136,7 +148,13 @@ class WorldModel(nn.Module):
             reward_sequence_batch,
             continue_sequence_batch
         )
-        return prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh
+        return (
+            prior_logits, 
+            posterior_logits, 
+            obs_log_lh, 
+            rew_log_lh, 
+            cont_log_lh
+        )
 
     def training_step(
             self, 

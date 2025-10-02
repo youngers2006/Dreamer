@@ -44,12 +44,11 @@ class Encoder(nn.Module):
     def encode(self, hidden_state, observation):
         B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state, observation)
-        logits_reshaped = logits.view(B, S, self.latent_num_rows, self.latent_num_columns)
         dist = torch.distributions.Categorical(logits=logits)
         sampled_idx = dist.sample()
         latent_state_flat = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_size)
         latent_state = latent_state_flat.view(B, S, self.latent_num_rows, self.latent_num_columns)
-        return latent_state, logits_reshaped
+        return latent_state, logits
 
 class Decoder(nn.Module):
     """
