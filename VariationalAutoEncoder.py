@@ -35,8 +35,6 @@ class Encoder(nn.Module):
         _, out_C, out_H, out_W = features.shape
         features = features.view(B, S, out_C, out_H, out_W)
         features = self.flatten(features)
-        print(features.shape)
-        print(hidden.shape)
         input = torch.cat((features, hidden), dim=-1)
         logits = self.latent_mapper(input)
         return logits

@@ -90,7 +90,7 @@ class Dreamer(nn.Module):
             cont_pred_hidden_num_nodes_1,
             cont_pred_hidden_num_nodes_2,
             device=device
-        )
+        ) 
         self.agent = Agent(
             action_dims,
             latent_state_dims,
@@ -157,7 +157,7 @@ class Dreamer(nn.Module):
             a_sigmas = torch.stack(a_sigmas, dim=0)
             return latent_states, hidden_states, actions, rewards, continues_, a_mus, a_sigmas
     
-        dream_batch_fn = torch.vmap(dream_episode, in_dims=(0,0))
+        dream_batch_fn = torch.vmap(dream_episode, in_dims=(0,0), randomness='different')
         z_batch_seq, h_batch_seq, a_batch_seq, rewards_batch_seq, continues_batch_seq, a_mu_batch_seq, a_sigma_batch_seq = dream_batch_fn(
             starting_latent_state_batch,
             starting_hidden_state_batch
@@ -166,22 +166,23 @@ class Dreamer(nn.Module):
     
     def rollout_policy(self, env, random_policy=False):
         observation, _ = env.reset(seed=self.seed)
-        observation = observation.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
-        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
+        observation = observation.transpose(2,0,1).astype(np.uint8)
+        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
         continue_ = True
         hidden_state = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
         latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
+        latent_state = latent_state.unsqueeze(0).unsqueeze(0)
         for _ in range(self.sequence_length):
             if random_policy:
                 action_np = env.action_space.sample()
                 action = torch.tensor(action_np, dtype=torch.float32, device=self.device)
-                action.unsqueeze_(0)
+                action = action.unsqueeze_(0).unsqueeze(0)
             else:
                 action, _, _ = self.agent.actor.act(hidden_state, latent_state)
                 action_np = action.detach().cpu().numpy().squeeze()
             observation_, reward, terminated, truncated, _ = env.step(action_np)
-            observation_ = observation_.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
-            observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device)
+            observation_ = observation_.transpose(2,0,1).astype(np.uint8)
+            observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
             done = (terminated or truncated)
             continue_ = (1 - done)
             self.buffer.add_to_buffer(observation, action_np, reward, continue_)
@@ -204,6 +205,7 @@ class Dreamer(nn.Module):
             observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch, _ = self.buffer.sample_sequences(
                 batch_size=self.batch_size
             )
+            
             loss_world_model = self.world_model.training_step(observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch)
             loss_list.append(loss_world_model)
         return loss_list

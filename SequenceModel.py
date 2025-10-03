@@ -10,17 +10,16 @@ class SequenceModel(nn.Module):
         self.device = device
 
         self.flatten = nn.Flatten(start_dim=2)
-        self.GRU = nn.GRU(
-            input_size=self.latent_dim + action_dim, 
-            hidden_size=hidden_dim, 
-            num_layers=num_layers, 
-            batch_first=True,
+        self.GRU = nn.GRUCell(
+            input_size=self.latent_dim + action_dim,
+            hidden_size=hidden_dim,
             device=device
         )
 
     def forward(self, last_latent_state: torch.tensor, last_hidden_state: torch.tensor, last_action: torch.tensor):
         last_latent_state = self.flatten(last_latent_state)
-        input_tensor = torch.cat((last_latent_state, last_action), dim=-1)
-        _, hidden = self.GRU(input_tensor, last_hidden_state)
-        return hidden
+        input_tensor = torch.cat((last_latent_state, last_action), dim=-1).squeeze(1)
+        last_hidden_state = last_hidden_state.squeeze(1)
+        hidden = self.GRU(input_tensor, last_hidden_state)
+        return hidden.unsqueeze(1)
 

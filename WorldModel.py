@@ -101,24 +101,24 @@ class WorldModel(nn.Module):
             posterior_latent = torch.zeros(1, 1, self.latent_num_rows, self.latent_num_columns, device=self.device)
 
             for t in range(self.horizon):
-                prev_action = action_sequence[:, t-1] if t > 0 else torch.zeros(1, 1, self.action_dims, device=self.device)
+                prev_action = action_sequence[:, t-1:t] if t > 0 else torch.zeros(1, 1, self.action_dims, device=self.device)
                 posterior_latent, hidden_state, posterior_logits_t = self.observe_step(
                     posterior_latent,
                     hidden_state,
                     prev_action,
-                    observation_sequence[:, t]
+                    observation_sequence[:, t:t+1] 
                 )
-                reward_th = to_twohot(reward_sequence[:, t], self.buckets)
+                reward_th = to_twohot(reward_sequence[:, t:t+1], self.reward_predictor.buckets_rew)
 
                 prior_latent_logits = self.dynamics_predictor(hidden_state)
                 dec_mu, dec_sig = self.decoder(hidden_state, posterior_latent)
                 rew_logits = self.reward_predictor(hidden_state, posterior_latent) 
                 cont_prob, _ = self.continue_predictor(hidden_state, posterior_latent)
 
-                observation_log_likelyhood = gaussian_log_probability(observation_sequence[:, t], dec_mu, dec_sig).sum()
-                continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[:, t])
+                observation_log_likelyhood = gaussian_log_probability(observation_sequence[:, t:t+1], dec_mu, dec_sig)
+                continue_log_likelyhood = bernoulli_log_probability(cont_prob, continue_sequence[:, t:t+1])
                 reward_log_probs = torch.nn.functional.log_softmax(rew_logits, dim=-1)
-                reward_log_likelyhood = torch.sum(reward_th * reward_log_probs)
+                reward_log_likelyhood = reward_th * reward_log_probs
 
                 posterior_logits.append(posterior_logits_t)
                 prior_logits.append(prior_latent_logits)
@@ -140,7 +140,7 @@ class WorldModel(nn.Module):
                 cont_likelyhood_seq.squeeze(0)
             )
 
-        batched_sequence_unroll = torch.vmap(single_sequence_unroll, in_dims=(0,0,0,0))
+        batched_sequence_unroll = torch.vmap(single_sequence_unroll, in_dims=(0,0,0,0), randomness='different')
         prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = batched_sequence_unroll(
             observation_sequence_batch,
             action_sequence_batch,
@@ -162,17 +162,26 @@ class WorldModel(nn.Module):
             reward_sequences: torch.tensor, 
             continue_sequences: torch.tensor
         ): # (batch_size, sequence_length, features)
+
+        obs_slice = observation_sequences[:, :self.horizon]
+        a_slice = action_sequences[:, :self.horizon]
+        r_slice = reward_sequences[:, :self.horizon]
+        c_slice = continue_sequences[:, :self.horizon]
+
         prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
-            observation_sequences,
-            action_sequences,
-            reward_sequences,
-            continue_sequences
+            obs_slice,
+            a_slice,
+            r_slice,
+            c_slice
         )
+
+        prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach())
+        posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach())
         prior_dist = torch.distributions.Categorical(logits=prior_logits)
         posterior_dist = torch.distributions.Categorical(logits=posterior_logits)
-        Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist.detach(), prior_dist).sum(dim=-1).mean()
-        Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist.detach()).sum(dim=-1).mean()
-        loss_pred_batch = - obs_log_lh - rew_log_lh - cont_log_lh
+        Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1).mean()
+        Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1).mean()
+        loss_pred_batch = - obs_log_lh.sum(dim=[-3, -2, -1]).squeeze(-1) - rew_log_lh.sum(dim=-1).squeeze(-1).squeeze(-1) - cont_log_lh.squeeze(-1).squeeze(-1)
         loss_pred = loss_pred_batch.mean()
         loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
         loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
