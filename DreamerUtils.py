@@ -8,7 +8,9 @@ def gaussian_log_probability(x: torch.tensor, mu: torch.tensor, sigma: torch.ten
     return log_prob
 
 def bernoulli_log_probability(p, k):
-    log_prob = k * torch.log(p) + (1 - k) * torch.log(1 - p)
+    epsilon = 1e-8
+    p_clamped = torch.clamp(p, min=epsilon, max=1.0 - epsilon)
+    log_prob = k * torch.log(p_clamped) + (1 - k) * torch.log(1 - p_clamped)
     return log_prob
 
 def kullback_leibler_divergence_between_gaussians(
@@ -30,12 +32,12 @@ def symexp(x):
 
 def to_twohot(value: torch.tensor, buckets: torch.tensor):
     clipped_value = torch.clamp(max=buckets.max(), min=buckets.min(), input=value)
-    lower_bucket_idx = torch.sum((buckets <= clipped_value), dim=-1, keepdim=True) - 1
+    lower_bucket_idx = torch.searchsorted(buckets, clipped_value, right=True) - 1
     lower_bucket_val = buckets[lower_bucket_idx]
     upper_bucket_val = buckets[lower_bucket_idx + 1]
     weight = (clipped_value - lower_bucket_val) / (upper_bucket_val - lower_bucket_val + 1e-8)
-    twohot_shape = list(value.shape) + [buckets.shape[-1]]
+    twohot_shape = value.shape[:-1] + (buckets.shape[0],)
     twohot = torch.zeros(twohot_shape, dtype=torch.float32, device=value.device)
-    twohot = torch.scatter(twohot, dim=-1, index=lower_bucket_idx.unsqueeze(-1), src=(1.0 - weight).unsqueeze(-1))
-    twohot = torch.scatter(twohot, dim=-1, index=(lower_bucket_idx + 1).unsqueeze(-1), src=weight.unsqueeze(-1))
+    twohot = torch.scatter(twohot, dim=-1, index=lower_bucket_idx, src=(1.0 - weight))
+    twohot = torch.scatter(twohot, dim=-1, index=(lower_bucket_idx + 1), src=weight)
     return twohot

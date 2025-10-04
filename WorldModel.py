@@ -62,7 +62,7 @@ class WorldModel(nn.Module):
         self.optimiser = torch.optim.AdamW(
             self.parameters(), 
             lr=WM_lr, 
-            betas=(WM_betas[0], WM_betas[1]), 
+            betas=(WM_betas[0], WM_betas[1]),  
             eps=WM_eps
         )
 

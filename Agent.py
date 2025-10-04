@@ -70,56 +70,54 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 continue_batch_seq.shape[1]
             )
         with torch.no_grad():
-            value_batched_seq = self.critic.value(z_batch_seq, h_batch_seq)
-            advantage_batched_seq = R_lambda_batch_seq - value_batched_seq
+            value_batched_seq = self.critic.value(h_batch_seq, z_batch_seq)
+            advantage_batched_seq = R_lambda_batch_seq - value_batched_seq[:, :-1]
+            advantage_batched_seq = advantage_batched_seq.squeeze(-1)
 
         a_dist_batch_seq = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
-        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq)
-        actor_entropy_batched_seq = a_dist_batch_seq.entropy()
+        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq).sum(dim=-1)
+        log_prob_batch_seq = log_prob_batch_seq[:, :-1]
+        actor_entropy_batched_seq = a_dist_batch_seq.entropy().sum(dim=-1)
+        actor_entropy_batched_seq = actor_entropy_batched_seq[:, :-1]
         self.update_S(R_lambda_batch_seq)
         normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device))
         loss_batched_seq_actor = log_prob_batch_seq * (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
-        loss_actor = -torch.sum(loss_batched_seq_actor, keepdim=False, dim=1).mean()
-
-        critic_logits = self.critic(h_batch_seq, z_batch_seq)
-        R_lambda_th_batch_seq = to_twohot(R_lambda_batch_seq, self.buckets)
+        loss_actor = -torch.mean(loss_batched_seq_actor)
+        critic_logits = self.critic(h_batch_seq, z_batch_seq)[:, :-1]
+        R_lambda_th_batch_seq = to_twohot(R_lambda_batch_seq, self.critic.buckets_crit)
         value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
         loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
         loss_critic = torch.mean(loss_batched_seq_critic)
 
         self.actor_optimiser.zero_grad()
-        loss_actor.backward()
-        self.actor_optimiser.step()
-
         self.critic_optimiser.zero_grad()
+
+        loss_actor.backward(retain_graph=True)
         loss_critic.backward()
+
+        self.actor_optimiser.step()
         self.critic_optimiser.step()
         return loss_actor, loss_critic
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
-        def compute_R_lambda_returns(hidden_state_seq, latent_state_seq, reward_seq, continue_seq, seq_length):
-            with torch.no_grad():
-                value_estimate_seq = self.critic.value(hidden_state_seq, latent_state_seq).detach()
-            R_lambda_seq = [value_estimate_seq[-1]]
-            for t in reversed(range(seq_length-1)):
-                R_lambda = reward_seq[t] + self.gamma * continue_seq[t] * ((1 - self.lambda_) * value_estimate_seq[t+1] + self.lambda_ * R_lambda_seq[0])
-                R_lambda_seq.insert(0, R_lambda)
-            R_lambda_seq = torch.stack(R_lambda_seq, dim=0)
-            return R_lambda_seq
-        
-        R_lambda_batched_seq = torch.vmap(compute_R_lambda_returns, in_dims=(0,0,0,0,None))(
-            hidden_state_batched_seq, 
-            latent_state_batched_seq, 
-            reward_batched_seq, 
-            continue_batched_seq, 
-            seq_length
-        )
-        return R_lambda_batched_seq
+        with torch.no_grad():
+            value_estimate_seq = self.critic.value(hidden_state_batched_seq, latent_state_batched_seq)
+        next_return = value_estimate_seq[:, -1]
+        R_lambda_seq = []
+        for t in reversed(range(seq_length - 1)):
+            reward_t = reward_batched_seq[:, t]         
+            continue_t = continue_batched_seq[:, t]  
+            value_t_plus_1 = value_estimate_seq[:, t+1] 
+            R_lambda = reward_t + self.gamma * continue_t * (1 - self.lambda_) * value_t_plus_1 + self.lambda_ * next_return
+            R_lambda_seq.insert(0, R_lambda)
+            next_return = R_lambda
+        R_lambda_seq = torch.stack(R_lambda_seq, dim=1)
+        return R_lambda_seq.squeeze(2).squeeze(-1)
         
 class Actor(nn.Module):
     def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):
         super().__init__()
-        self.flatten = nn.Flatten()
+        self.flatten = nn.Flatten(start_dim=2)
         self.base_net = nn.Sequential(
             nn.Linear(in_features=latent_row_dim * latent_column_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
             nn.SiLU(),
@@ -140,8 +138,8 @@ class Actor(nn.Module):
     
     def act(self, ht, zt):
         mu, sigma = self.forward(ht, zt)
-        action_dist = Normal(loc=mu, scale=sigma)
-        action = action_dist.rsample()
+        eps = torch.randn_like(mu)
+        action = mu + eps * sigma
         return action, mu, sigma
 
 class Critic(nn.Module):
@@ -150,7 +148,7 @@ class Critic(nn.Module):
         self.latent_row_dim = latent_row_dim
         self.latent_column_dim = latent_column_dim
         self.num_buckets = num_buckets
-        self.flatten = nn.Flatten()
+        self.flatten = nn.Flatten(start_dim=2)
         self.value_net = nn.Sequential(
             nn.Linear(in_features=latent_column_dim * latent_row_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
             nn.SiLU(),
@@ -171,4 +169,4 @@ class Critic(nn.Module):
         logits = self.forward(ht, zt)
         probs = torch.nn.functional.softmax(logits, dim=-1)
         value = torch.sum(probs * self.buckets_crit, dim=-1, keepdim=True)
-        return value
+        return value 

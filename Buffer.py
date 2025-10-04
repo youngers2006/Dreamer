@@ -43,6 +43,5 @@ class Buffer:
         actions = torch.tensor(actions, dtype=torch.float32, device=self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         continues = torch.tensor(continues, dtype=torch.float32, device=self.device)
-        sequence_length = torch.tensor(sequence_length, dtype=torch.float32, device=self.device)
 
         return observations, actions, rewards, continues, sequence_length
