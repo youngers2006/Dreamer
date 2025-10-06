@@ -4,7 +4,8 @@ def gaussian_log_probability(x: torch.tensor, mu: torch.tensor, sigma: torch.ten
     """
     Calculate the log likelyhood of x apprearing in the gaussian distribution defined by mu and sigma.
     """
-    log_prob = - torch.log(sigma) - (0.5) * torch.log(torch.tensor(2 * torch.pi)) - (0.5) * torch.square((x - mu) / sigma)
+    dist = torch.distributions.Normal(loc=mu, scale=sigma)
+    log_prob = dist.log_prob(x)
     return log_prob
 
 def bernoulli_log_probability(p, k):

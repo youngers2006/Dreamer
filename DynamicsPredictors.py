@@ -90,7 +90,6 @@ class ContinuePredictor(nn.Module):
         return probability, logit
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
-        latent_state = self.flatten(latent_state)
         probability, _ = self.forward(hidden_state, latent_state)
-        continue_ = (probability >= 0.05)
+        continue_ = (probability >= 0.5)
         return continue_
