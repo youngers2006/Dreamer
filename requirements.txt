@@ -1,0 +1,16 @@
+# cuda 12.1 - pytorch location
+--index-url https://download.pytorch.org/whl/cu121
+
+# Core ML and Scientific Libraries
+torch==2.1.2
+torchvision==0.16.2
+torchaudio==2.1.2
+numpy
+matplotlib
+
+# Reinforcement Learning Environment
+gymnasium[box2d, pygame]
+
+# Jupyter Notebook Support
+jupyterlab
+ipykernel

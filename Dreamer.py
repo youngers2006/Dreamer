@@ -132,46 +132,30 @@ class Dreamer(nn.Module):
         self.device = device
 
     def dream_episodes(self, starting_latent_state_batch, starting_hidden_state_batch):
-        def dream_episode(starting_latent_state, starting_hidden_state):
-            hidden_state = starting_hidden_state.unsqueeze(0)
-            latent_state = starting_latent_state.unsqueeze(0)
-            hidden_states = []
-            latent_states = []
-            rewards = []
-            actions = []
-            continues_ = []
-            a_mus = []
-            a_sigmas = []
-            for _ in range(self.horizon):
-                action, a_mu, a_sigma = self.agent.actor.act(hidden_state, latent_state)
-                hidden_state_, latent_state_, reward, continue_ = self.world_model.imagine_step(hidden_state, latent_state, action)
-                hidden_states.append(hidden_state.squeeze(1)) ; latent_states.append(latent_state.squeeze(1))
-                rewards.append(reward) ; actions.append(action) ; continues_.append(continue_)
-                a_mus.append(a_mu) ; a_sigmas.append(a_sigma)
-                hidden_state = hidden_state_ ; latent_state = latent_state_
-            latent_states = torch.stack(latent_states, dim=1)
-            hidden_states = torch.stack(hidden_states, dim=1)
-            actions = torch.stack(actions, dim=1)
-            rewards = torch.stack(rewards, dim=1)
-            continues_ = torch.stack(continues_, dim=1)
-            a_mus = torch.stack(a_mus, dim=1)
-            a_sigmas = torch.stack(a_sigmas, dim=1)
-            return (
-                latent_states.squeeze(0), 
-                hidden_states.squeeze(0), 
-                actions.squeeze(0), 
-                rewards.squeeze(0), 
-                continues_.squeeze(0), 
-                a_mus.squeeze(0), 
-                a_sigmas.squeeze(0)
-            )
-    
-        dream_batch_fn = torch.vmap(dream_episode, in_dims=(0,0), randomness='different')
-        z_batch_seq, h_batch_seq, a_batch_seq, rewards_batch_seq, continues_batch_seq, a_mu_batch_seq, a_sigma_batch_seq = dream_batch_fn(
-            starting_latent_state_batch,
-            starting_hidden_state_batch
-        ) 
-        return z_batch_seq, h_batch_seq, a_batch_seq, rewards_batch_seq, continues_batch_seq, a_mu_batch_seq, a_sigma_batch_seq
+        hidden_state_batch = starting_hidden_state_batch
+        latent_state_batch = starting_latent_state_batch
+        hidden_states = []
+        latent_states = []
+        rewards = []
+        actions = []
+        continues_ = []
+        a_mus = []
+        a_sigmas = []
+        for _ in range(self.horizon):
+            action_batch, a_mu_batch, a_sigma_batch = self.agent.actor.act(hidden_state_batch, latent_state_batch)
+            hidden_state__batch, latent_state__batch, reward_batch, continue_batch = self.world_model.imagine_step(hidden_state_batch, latent_state_batch, action_batch)
+            hidden_states.append(hidden_state_batch) ; latent_states.append(latent_state_batch)
+            rewards.append(reward_batch) ; actions.append(action_batch) ; continues_.append(continue_batch)
+            a_mus.append(a_mu_batch) ; a_sigmas.append(a_sigma_batch)
+            hidden_state_batch = hidden_state__batch ; latent_state_batch = latent_state__batch
+        latent_states = torch.cat(latent_states, dim=1)
+        hidden_states = torch.cat(hidden_states, dim=1)
+        actions = torch.cat(actions, dim=1)
+        rewards = torch.cat(rewards, dim=1)
+        continues_ = torch.cat(continues_, dim=1)
+        a_mus = torch.cat(a_mus, dim=1)
+        a_sigmas = torch.cat(a_sigmas, dim=1)
+        return latent_states, hidden_states, actions, rewards, continues_, a_mus, a_sigmas
     
     def rollout_policy(self, env, random_policy=False):
         observation, _ = env.reset(seed=self.seed)
@@ -241,6 +225,7 @@ class Dreamer(nn.Module):
                 initial_latent_batch,
                 initial_hidden_batch
             )
+
             loss_actor, loss_critic = self.agent.train_step(
                 latent_seq_batch_dream, 
                 hidden_seq_batch_dream, 

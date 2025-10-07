@@ -105,14 +105,18 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         next_return = value_estimate_seq[:, -1]
         R_lambda_seq = []
         for t in reversed(range(seq_length - 1)):
-            reward_t = reward_batched_seq[:, t]         
-            continue_t = continue_batched_seq[:, t]  
-            value_t_plus_1 = value_estimate_seq[:, t+1] 
-            R_lambda = reward_t + self.gamma * continue_t * (1 - self.lambda_) * value_t_plus_1 + self.lambda_ * next_return
+            reward_t = reward_batched_seq[:, t]
+            continue_t = continue_batched_seq[:, t]
+            value_t_plus_1 = value_estimate_seq[:, t+1]
+            if reward_t.dim() == 1:
+                reward_t = reward_t.unsqueeze(-1)
+            if continue_t.dim() == 1:
+                continue_t = continue_t.unsqueeze(-1)
+            R_lambda = reward_t + self.gamma * continue_t * ((1 - self.lambda_) * value_t_plus_1 + self.lambda_ * next_return)
             R_lambda_seq.insert(0, R_lambda)
             next_return = R_lambda
         R_lambda_seq = torch.stack(R_lambda_seq, dim=1)
-        return R_lambda_seq.squeeze(2).squeeze(-1)
+        return R_lambda_seq
         
 class Actor(nn.Module):
     def __init__(self, action_dim, latent_column_dim, latent_row_dim, hidden_state_dim, hidden_layer_num_nodes_1, hidden_layer_num_nodes_2,*, device='cpu'):

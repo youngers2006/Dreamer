@@ -162,7 +162,7 @@ class WorldModel(nn.Module):
         posterior_dist = torch.distributions.Categorical(logits=posterior_logits)
         Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1).mean()
         Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1).mean()
-        loss_pred_batch = - obs_log_lh.sum(dim=[-3, -2, -1]).squeeze(-1) - rew_log_lh.squeeze(-1).squeeze(-1) - cont_log_lh.squeeze(-1).squeeze(-1)
+        loss_pred_batch = - obs_log_lh.sum(dim=[-3, -2, -1]) - rew_log_lh.squeeze(-1) - cont_log_lh.squeeze(-1)
         loss_pred = loss_pred_batch.mean()
         loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
         loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
