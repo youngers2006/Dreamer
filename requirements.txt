@@ -14,3 +14,6 @@ gymnasium[box2d, pygame]
 # Jupyter Notebook Support
 jupyterlab
 ipykernel
+
+# For config
+PyYAML
