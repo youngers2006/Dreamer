@@ -6,58 +6,61 @@ from WorldModel import WorldModel
 from Agent import Agent
 from Buffer import Buffer
 from tqdm import tqdm
+import yaml
 
 class Dreamer(nn.Module):
     def __init__(
             self, 
-            hidden_state_dims,
-            latent_state_dims,
-            observation_dims,
-            action_dims,
-            world_model_lr,
-            world_model_betas,
-            world_model_eps,
-            WM_epochs, 
-            beta_prediction,
-            beta_dynamics,
-            beta_representation,
-            critic_reward_buckets,
-            encoder_filter_num_1,
-            encoder_filter_num_2,
-            encoder_hidden_layer_nodes,
-            decoder_filter_num_1,
-            decoder_filter_num_2,
-            decoder_hidden_layer_nodes,
-            dyn_pred_hidden_num_nodes_1,
-            dyn_pred_hidden_num_nodes_2,
-            rew_pred_hidden_num_nodes_1,
-            rew_pred_hidden_num_nodes_2,
-            cont_pred_hidden_num_nodes_1,
-            cont_pred_hidden_num_nodes_2,
-            actor_lr,
-            actor_betas,
-            actor_eps,
-            critic_lr, 
-            critic_betas,
-            critic_eps,
-            AC_epochs, 
-            hidden_layer_actor_1_size,
-            hidden_layer_actor_2_size,
-            hidden_layer_critic_1_size,
-            hidden_layer_critic_2_size,
-            horizon, 
-            batch_size, 
-            training_iterations,
-            random_iterations,
-            nu,
-            lambda_,
-            gamma,
-            buffer_size,
-            sequence_length,
-            seed, 
+            config,
             device
         ):
         super().__init__()
+        hidden_state_dims=config['hidden_state_dims']
+        latent_state_dims=tuple(config['latent_state_dims'])
+        observation_dims=tuple(config['observation_dims'])
+        action_dims=config['action_dims']
+        world_model_lr=config['world_model_lr']
+        world_model_betas=tuple(config['world_model_betas'])
+        world_model_eps=config['world_model_eps']
+        WM_epochs=config['WM_epochs']
+        beta_prediction=config['beta_prediction']
+        beta_dynamics=config['beta_dynamics']
+        beta_representation=config['beta_representation']
+        critic_reward_buckets=config['critic_reward_buckets']
+        encoder_filter_num_1=config['encoder_filter_num_1']
+        encoder_filter_num_2=config['encoder_filter_num_2']
+        encoder_hidden_layer_nodes=config['encoder_hidden_layer_nodes']
+        decoder_filter_num_1=config['decoder_filter_num_1']
+        decoder_filter_num_2=config['decoder_filter_num_2']
+        decoder_hidden_layer_nodes=config['decoder_hidden_layer_nodes']
+        dyn_pred_hidden_num_nodes_1=config['dyn_pred_hidden_num_nodes_1']
+        dyn_pred_hidden_num_nodes_2=config['dyn_pred_hidden_num_nodes_2']
+        rew_pred_hidden_num_nodes_1=config['rew_pred_hidden_num_nodes_1']
+        rew_pred_hidden_num_nodes_2=config['rew_pred_hidden_num_nodes_2']
+        cont_pred_hidden_num_nodes_1=config['cont_pred_hidden_num_nodes_1']
+        cont_pred_hidden_num_nodes_2=config['cont_pred_hidden_num_nodes_2']
+        actor_lr=config['actor_lr']
+        actor_betas=tuple(config['actor_betas'])
+        actor_eps=config['actor_eps']
+        critic_lr=config['critic_lr']
+        critic_betas=tuple(config['critic_betas'])
+        critic_eps=config['critic_eps']
+        AC_epochs=config['AC_epochs']
+        hidden_layer_actor_1_size=config['hidden_layer_actor_1_size']
+        hidden_layer_actor_2_size=config['hidden_layer_actor_2_size']
+        hidden_layer_critic_1_size=config['hidden_layer_critic_1_size']
+        hidden_layer_critic_2_size=config['hidden_layer_critic_2_size']
+        horizon=config['horizon']
+        batch_size=config['batch_size']
+        training_iterations=config['training_iterations']
+        random_iterations=config['random_iterations']
+        nu=config['nu']
+        lambda_=config['lambda_']
+        gamma=config['gamma']
+        buffer_size=config['buffer_size']
+        sequence_length=config['sequence_length']
+        seed=config['seed']
+
         self.hidden_state_dims = hidden_state_dims
         self.action_dims = action_dims
         self.observation_dims = observation_dims
@@ -132,6 +135,11 @@ class Dreamer(nn.Module):
         self.device = device
 
     def dream_episodes(self, starting_latent_state_batch, starting_hidden_state_batch):
+        """
+        Purpose: given a starting state use the world model to imagine future trajectories within the horizon.
+        Args: latent state representation of the starting state, hidden state of the sequence model at the starting state.
+        Returns: latent states, hidden states, actions, rewards, continue flags, action distribution params. All from the imagined trajectory.
+        """
         hidden_state_batch = starting_hidden_state_batch
         latent_state_batch = starting_latent_state_batch
         hidden_states = []
@@ -158,6 +166,11 @@ class Dreamer(nn.Module):
         return latent_states, hidden_states, actions, rewards, continues_, a_mus, a_sigmas
     
     def rollout_policy(self, env, random_policy=False):
+        """
+        Purpose: rolls out either the current trained policy or a random policy to collect trajectories for training.
+        Args: environments to roll out on, flag to either use random or trained policy.
+        Returns: No explicit returns, all collected data is added to the buffer.
+        """
         observation, _ = env.reset(seed=self.seed)
         observation = observation.transpose(2,0,1).astype(np.uint8)
         observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
@@ -193,6 +206,11 @@ class Dreamer(nn.Module):
                 observation_tensor = observation__tensor
 
     def train_world_model(self):
+        """
+        Purpose: Samples a batch of trajectories from the buffer and uses these to train the world model.
+        Args: None.
+        Returns: Training losses log.
+        """
         loss_list = []
         for _ in tqdm(range(self.WM_epochs), desc="Training World Model On Buffer Data", leave=False):
             observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch, _ = self.buffer.sample_sequences(
@@ -204,6 +222,12 @@ class Dreamer(nn.Module):
         return loss_list
 
     def warm_start_generator(self, observation_seq_batch, action_seq_batch, sequence_length):
+        """
+        Purpose: Since the sampled sequence length is longer than the horizon this function takes the tajectories and 
+                calculates the hidden and latent states for where in the sequence the agent starts training on.
+        Args: observations, actions, from a batch of imagined trajectories, length of the imagined trajectories.
+        Returns
+        """
         hidden_batch = torch.zeros(self.batch_size, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
         latent_batch, _ = self.world_model.encoder.encode(hidden_batch, observation_seq_batch[:, 0:1, :])
         warmup_length = sequence_length // 2
