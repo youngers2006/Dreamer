@@ -5,10 +5,7 @@ env_id: "CarRacing-v3"
 hidden_state_dims: 100
 latent_state_dims: [32, 32]
 action_dims: 3
-hidden_state_dims: 100
-latent_state_dims: (32, 32)
-observation_dims: (96, 96)
-action_dims: 3
+observation_dims: [96, 96]
 encoder_filter_num_1: 32
 encoder_filter_num_2: 64
 encoder_hidden_layer_nodes: 200
@@ -38,21 +35,19 @@ sequence_length: 30
 seed: 42
 training_iterations: 40
 random_iterations: 40
-actor_lr: 8e-5
-actor_betas: (0.9,0.999)
-actor_eps: 1e-7
-critic_lr: 8e-5
-critic_betas: (0.9,0.999)
-critic_eps: 1e-7
+actor_lr: 0.00008
+actor_betas: [0.9,0.999]
+actor_eps: 0.0000001
+critic_lr: 0.00008
+critic_betas: [0.9,0.999]
+critic_eps: 0.0000001
 AC_epochs: 10
-world_model_lr: 2e-4
-world_model_betas: (0.9,0.999)
-world_model_eps: 1e-7
+world_model_lr: 0.0002
+world_model_betas: [0.9,0.999]
+world_model_eps: 0.0000001
 WM_epochs: 100
 beta_prediction: 0.1
 beta_dynamics: 0.5
 beta_representation: 1.0
 critic_reward_buckets: 255
-wm_lr: 2.0e-4
-actor_lr: 8.0e-5
-critic_lr: 8.0e-5
+wm_lr: 0.0002
