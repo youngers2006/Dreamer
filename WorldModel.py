@@ -152,7 +152,7 @@ class WorldModel(nn.Module):
         r_slice = reward_sequences[:, :self.horizon]
         c_slice = continue_sequences[:, :self.horizon]
 
-        with torch.autocast(device_type=self.device, dtype=torch.float16):
+        with torch.autocast(device_type=self.device.type, dtype=torch.float16):
             prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model_compiled(
                 obs_slice,
                 a_slice,

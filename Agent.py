@@ -64,7 +64,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.S = (1.0 - alpha) * self.S + alpha * range
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
-        with torch.autocast(device_type=self.device, dtype=torch.float16):
+        z_batch_seq = z_batch_seq.detach() 
+        h_batch_seq = h_batch_seq.detach()
+        with torch.autocast(device_type=self.device.type, dtype=torch.float16):
             R_lambda_batch_seq = self.compute_batched_R_lambda_returns_compiled(
                     h_batch_seq,
                     z_batch_seq,
@@ -95,8 +97,11 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.actor_optimiser.zero_grad()
         self.critic_optimiser.zero_grad()
 
-        self.scalar.scale(loss_actor).backward(retain_graph=True)
+        self.scalar.scale(loss_actor).backward()
         self.scalar.scale(loss_critic).backward()
+
+        self.scalar.unscale_(self.actor_optimiser)
+        self.scalar.unscale_(self.critic_optimiser)
 
         self.scalar.step(self.actor_optimiser)
         self.scalar.step(self.critic_optimiser)
