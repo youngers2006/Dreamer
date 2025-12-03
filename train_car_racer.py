@@ -19,8 +19,8 @@ def main(config):
     env_id = config['env_id']
     env = gym.make(env_id, continuous=True)
     evaluation_env = gym.make(env_id, continuous=True)
-    env = ResizeObservation(env, config['observation_dims'])
-    evaluation_env = ResizeObservation(evaluation_env, config['observation_dims'])
+    env = ResizeObservation(env, tuple(config['observation_dims']))
+    evaluation_env = ResizeObservation(evaluation_env, tuple(config['observation_dims']))
 
     WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list = dreamer_agent.train_dreamer(env, evaluation_env)
     model_dir = os.environ.get('SM_MODEL_DIR', '/opt/ml/model')
