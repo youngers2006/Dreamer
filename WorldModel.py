@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.cuda.amp import GradScaler
 from VariationalAutoEncoder import Decoder, Encoder
 from DynamicsPredictors import DynamicsPredictor, RewardPredictor, ContinuePredictor
 from SequenceModel import SequenceModel
@@ -65,6 +66,8 @@ class WorldModel(nn.Module):
             betas=(WM_betas[0], WM_betas[1]),  
             eps=WM_eps
         )
+        self.scalar = torch.amp.GradScaler()
+        self.unroll_model_compiled = torch.compile(self.unroll_model)
 
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(latent_state, hidden_state, action)
@@ -149,28 +152,31 @@ class WorldModel(nn.Module):
         r_slice = reward_sequences[:, :self.horizon]
         c_slice = continue_sequences[:, :self.horizon]
 
-        prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
-            obs_slice,
-            a_slice,
-            r_slice,
-            c_slice
-        )
+        with torch.autocast(device_type=self.device, dtype=torch.float16):
+            prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model_compiled(
+                obs_slice,
+                a_slice,
+                r_slice,
+                c_slice
+            )
 
-        prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach())
-        posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach())
-        prior_dist = torch.distributions.Categorical(logits=prior_logits)
-        posterior_dist = torch.distributions.Categorical(logits=posterior_logits)
-        Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1).mean()
-        Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1).mean()
-        loss_pred_batch = - obs_log_lh.sum(dim=[-3, -2, -1]) - rew_log_lh.squeeze(-1) - cont_log_lh.squeeze(-1)
-        loss_pred = loss_pred_batch.mean()
-        loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
-        loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
-        total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
+            prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach())
+            posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach())
+            prior_dist = torch.distributions.Categorical(logits=prior_logits)
+            posterior_dist = torch.distributions.Categorical(logits=posterior_logits)
+            Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1).mean()
+            Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1).mean()
+            loss_pred_batch = - obs_log_lh.sum(dim=[-3, -2, -1]) - rew_log_lh.squeeze(-1) - cont_log_lh.squeeze(-1)
+            loss_pred = loss_pred_batch.mean()
+            loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
+            loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
+            total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
 
         self.optimiser.zero_grad()
-        total_loss.backward()
+        self.scalar.scale(total_loss).backward()
+        self.scalar.unscale_(self.optimiser)
         nn.utils.clip_grad_norm_(self.parameters(), 100.0)
-        self.optimiser.step()
+        self.scalar.step(self.optimiser)
+        self.scalar.update()
 
         return total_loss

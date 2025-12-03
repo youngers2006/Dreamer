@@ -5,7 +5,7 @@ env_id: "CarRacing-v3"
 hidden_state_dims: 512
 latent_state_dims: [32, 32]
 action_dims: 3
-observation_dims: [96, 96]
+observation_dims: [64, 64]
 encoder_filter_num_1: 64
 encoder_filter_num_2: 128
 encoder_hidden_layer_nodes: 512

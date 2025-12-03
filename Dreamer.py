@@ -134,6 +134,8 @@ class Dreamer(nn.Module):
         self.seed = seed
         self.device = device
 
+        self.dream_episodes_compiled = torch.compile(self.dream_episodes)
+
     def dream_episodes(self, starting_latent_state_batch, starting_hidden_state_batch):
         """
         Purpose: given a starting state use the world model to imagine future trajectories within the horizon.
@@ -245,11 +247,10 @@ class Dreamer(nn.Module):
         for _ in tqdm(range(self.AC_epochs), desc="Training Agent in Dreams", leave=False):
             observation_seq_batch, action_seq_batch, _, _, sequence_length = self.buffer.sample_sequences(batch_size=self.batch_size)
             initial_latent_batch, initial_hidden_batch = self.warm_start_generator(observation_seq_batch, action_seq_batch, sequence_length)
-            latent_seq_batch_dream, hidden_seq_batch_dream, action_seq_batch_dream, reward_seq_batch_dream, continue_seq_batch_dream, a_mu_batch_seq, a_sigma_batch_seq = self.dream_episodes(
+            latent_seq_batch_dream, hidden_seq_batch_dream, action_seq_batch_dream, reward_seq_batch_dream, continue_seq_batch_dream, a_mu_batch_seq, a_sigma_batch_seq = self.dream_episodes_compiled(
                 initial_latent_batch,
                 initial_hidden_batch
             )
-
             loss_actor, loss_critic = self.agent.train_step(
                 latent_seq_batch_dream, 
                 hidden_seq_batch_dream, 

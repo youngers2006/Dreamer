@@ -1,13 +1,13 @@
 import torch as nn
 import torch.nn
 import gymnasium as gym
+from gymnasium.wrappers import ResizeObservation
 from Dreamer import Dreamer
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import yaml
 import argparse
-import csv
 
 def main(config): 
     device = torch.device(config['device'])
@@ -19,6 +19,9 @@ def main(config):
     env_id = config['env_id']
     env = gym.make(env_id, continuous=True)
     evaluation_env = gym.make(env_id, continuous=True)
+    env = ResizeObservation(env, config['observation_dims'])
+    evaluation_env = ResizeObservation(evaluation_env, config['observation_dims'])
+
     WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list = dreamer_agent.train_dreamer(env, evaluation_env)
     model_dir = os.environ.get('SM_MODEL_DIR', '/opt/ml/model')
     os.makedirs(model_dir, exist_ok=True)
