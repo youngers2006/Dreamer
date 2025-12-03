@@ -64,8 +64,6 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.S = (1.0 - alpha) * self.S + alpha * range
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
-        z_batch_seq = z_batch_seq.detach() 
-        h_batch_seq = h_batch_seq.detach()
         with torch.autocast(device_type=self.device.type, dtype=torch.float16):
             R_lambda_batch_seq = self.compute_batched_R_lambda_returns_compiled(
                     h_batch_seq,
@@ -82,14 +80,21 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             a_dist_batch_seq = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
             log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq).sum(dim=-1)
             log_prob_batch_seq = log_prob_batch_seq[:, :-1]
+
             actor_entropy_batched_seq = a_dist_batch_seq.entropy().sum(dim=-1)
             actor_entropy_batched_seq = actor_entropy_batched_seq[:, :-1]
+
             self.update_S(R_lambda_batch_seq)
             normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device))
-            loss_batched_seq_actor = log_prob_batch_seq * (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
+
+            loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
             loss_actor = -torch.mean(loss_batched_seq_actor)
-            critic_logits = self.critic(h_batch_seq, z_batch_seq)[:, :-1]
-            R_lambda_th_batch_seq = to_twohot(R_lambda_batch_seq, self.critic.buckets_crit)
+
+            critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
+
+            target_returns = R_lambda_batch_seq.detach()
+            R_lambda_th_batch_seq = to_twohot(target_returns, self.critic.buckets_crit)
+
             value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
             loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
             loss_critic = torch.mean(loss_batched_seq_critic)
@@ -102,6 +107,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
 
         self.scalar.unscale_(self.actor_optimiser)
         self.scalar.unscale_(self.critic_optimiser)
+
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 100.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 100.0)
 
         self.scalar.step(self.actor_optimiser)
         self.scalar.step(self.critic_optimiser)

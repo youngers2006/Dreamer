@@ -8,6 +8,7 @@ import numpy as np
 import os
 import yaml
 import argparse
+torch.set_float32_matmul_precision('high')
 
 def main(config): 
     device = torch.device(config['device'])

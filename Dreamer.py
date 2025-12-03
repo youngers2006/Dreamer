@@ -244,6 +244,7 @@ class Dreamer(nn.Module):
     
     def train_Agent(self):
         loss_actor_list = [] ; loss_critic_list = []
+        self.world_model.requires_grad_(False)
         for _ in tqdm(range(self.AC_epochs), desc="Training Agent in Dreams", leave=False):
             observation_seq_batch, action_seq_batch, _, _, sequence_length = self.buffer.sample_sequences(batch_size=self.batch_size)
             initial_latent_batch, initial_hidden_batch = self.warm_start_generator(observation_seq_batch, action_seq_batch, sequence_length)
@@ -262,6 +263,7 @@ class Dreamer(nn.Module):
             )
             loss_actor_list.append(loss_actor)
             loss_critic_list.append(loss_critic)
+        self.world_model.requires_grad_(True)
         loss_actor_list = torch.stack(loss_actor_list, dim=0)
         loss_critic_list = torch.stack(loss_critic_list, dim=0)
         return loss_actor_list.mean(dim=0), loss_critic_list.mean(dim=0)
