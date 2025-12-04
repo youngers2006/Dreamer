@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.distributions import Normal
+from torch.distributions import Normal, TanhTransform, TransformedDistribution
 from DreamerUtils import symexp, to_twohot
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
@@ -74,12 +74,13 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             advantage_batched_seq = R_lambda_batch_seq - value_batched_seq[:, :-1]
             advantage_batched_seq = advantage_batched_seq.squeeze(-1)
 
-        a_dist_batch_seq = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
+        base_dist = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
+        a_dist_batch_seq = TransformedDistribution(base_dist, [TanhTransform()])
+
         log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq).sum(dim=-1)
         log_prob_batch_seq = log_prob_batch_seq[:, :-1]
 
-        actor_entropy_batched_seq = a_dist_batch_seq.entropy().sum(dim=-1)
-        actor_entropy_batched_seq = actor_entropy_batched_seq[:, :-1]
+        actor_entropy_batched_seq = - log_prob_batch_seq
 
         self.update_S(R_lambda_batch_seq)
         normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device))
@@ -150,10 +151,14 @@ class Actor(nn.Module):
         sigma = torch.nn.functional.softplus(log_sig) + 1e-4
         return mu, sigma
     
-    def act(self, ht, zt):
+    def act(self, ht, zt, deterministic=False):
         mu, sigma = self.forward(ht, zt)
-        eps = torch.randn_like(mu)
-        action = mu + eps * sigma
+        if deterministic:
+            action = torch.tanh(mu)
+        else:
+            base_dist = Normal(mu, sigma)
+            dist = TransformedDistribution(base_dist, [TanhTransform()])
+            action = dist.rsample()
         return action, mu, sigma
 
 class Critic(nn.Module):

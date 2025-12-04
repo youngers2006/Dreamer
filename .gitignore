@@ -1,1 +1,7 @@
 __pycache__/
+models/*.pth
+models/*.npz
+logs/*.pth
+logs/*.npz
+logs/
+models/
