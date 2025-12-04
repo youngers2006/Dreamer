@@ -45,14 +45,14 @@ def to_twohot(value: torch.tensor, buckets: torch.tensor):
     return twohot
 
 def _sanitize_for_save(data_list):
-        """Helper to recursively convert GPU tensors to CPU floats/arrays"""
-        clean_data = []
-        for item in data_list:
-            if isinstance(item, torch.Tensor):
-                clean_data.append(item.detach().cpu().item())
-            elif isinstance(item, list):
-                # Handle list of tensors (like WM_loss per epoch)
-                clean_data.append([x.detach().cpu().item() if isinstance(x, torch.Tensor) else x for x in item])
-            else:
-                clean_data.append(item)
-        return np.array(clean_data)
+    """Helper to recursively convert GPU tensors to CPU floats/arrays"""
+    clean_data = []
+    for item in data_list:
+        if isinstance(item, torch.Tensor):
+            clean_data.append(item.detach().cpu().item())
+        elif isinstance(item, list):
+            # Handle list of tensors (like WM_loss per epoch)
+            clean_data.append([x.detach().cpu().item() if isinstance(x, torch.Tensor) else x for x in item])
+        else:
+            clean_data.append(item)
+    return np.array(clean_data)
