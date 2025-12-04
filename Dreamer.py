@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -317,6 +318,26 @@ class Dreamer(nn.Module):
             WM_loss = self.train_world_model()
             actor_loss, critic_loss = self.train_Agent()
             WM_loss_list.append(WM_loss) ; actor_loss_list.append(actor_loss) ; critic_loss_list.append(critic_loss)
+
+            if iter % 100 == 0: # Save every 100 iterations
+                # Save Model
+                save_path = os.path.join('./models', f'agent_checkpoint_{iter}.pth')
+                self.save_trained_Dreamer(save_path)
+                
+                # Save Latest Model (overwrite)
+                latest_path = os.path.join('./models', 'agent_latest.pth')
+                self.save_trained_Dreamer(latest_path)
+
+                # Save Logs
+                log_path = os.path.join('./models', 'training_logs.npz')
+                np.savez(
+                    log_path,
+                    world_model_loss=np.array(WM_loss_list),
+                    actor_loss=np.array(actor_loss_list),
+                    critic_loss=np.array(critic_loss_list),
+                    rewards=np.array(evaluation_list)
+                )
+
             if iter % 20 == 0:
                 eval_reward = self.evaluate_agent(eval_env, eval_episodes=3)
                 evaluation_list.append(eval_reward)
