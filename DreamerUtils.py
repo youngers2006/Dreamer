@@ -1,4 +1,5 @@
 import torch 
+import numpy as np
 
 def gaussian_log_probability(x: torch.tensor, mu: torch.tensor, sigma: torch.tensor) -> torch.tensor:
     """
@@ -42,3 +43,16 @@ def to_twohot(value: torch.tensor, buckets: torch.tensor):
     twohot = torch.scatter(twohot, dim=-1, index=lower_bucket_idx, src=(1.0 - weight))
     twohot = torch.scatter(twohot, dim=-1, index=(lower_bucket_idx + 1), src=weight)
     return twohot
+
+def _sanitize_for_save(self, data_list):
+        """Helper to recursively convert GPU tensors to CPU floats/arrays"""
+        clean_data = []
+        for item in data_list:
+            if isinstance(item, torch.Tensor):
+                clean_data.append(item.detach().cpu().item())
+            elif isinstance(item, list):
+                # Handle list of tensors (like WM_loss per epoch)
+                clean_data.append([x.detach().cpu().item() if isinstance(x, torch.Tensor) else x for x in item])
+            else:
+                clean_data.append(item)
+        return np.array(clean_data)

@@ -8,6 +8,7 @@ from Agent import Agent
 from Buffer import Buffer
 from tqdm import tqdm
 import yaml
+from DreamerUtils import _sanitize_for_save
 
 class Dreamer(nn.Module):
     def __init__(
@@ -318,9 +319,9 @@ class Dreamer(nn.Module):
             WM_loss = self.train_world_model()
             actor_loss, critic_loss = self.train_Agent()
 
-            WM_loss_list.append([l.detach().cpu().item() for l in WM_loss])
-            actor_loss_list.append(actor_loss.detach().cpu().item())
-            critic_loss_list.append(critic_loss.detach().cpu().item())
+            WM_loss_list.append(WM_loss)
+            actor_loss_list.append(actor_loss)
+            critic_loss_list.append(critic_loss)
 
             if iter % 1000 == 0: # Save every 1000 iterations
                 # Save Model
@@ -335,10 +336,10 @@ class Dreamer(nn.Module):
                 log_path = os.path.join('./models', 'training_logs.npz')
                 np.savez(
                     log_path,
-                    world_model_loss=np.array(WM_loss_list),
-                    actor_loss=np.array(actor_loss_list),
-                    critic_loss=np.array(critic_loss_list),
-                    rewards=np.array(evaluation_list)
+                    world_model_loss=_sanitize_for_save(WM_loss_list),
+                    actor_loss=_sanitize_for_save(actor_loss_list),
+                    critic_loss=_sanitize_for_save(critic_loss_list),
+                    rewards=_sanitize_for_save(evaluation_list)
                 )
 
             if iter % 20 == 0:
