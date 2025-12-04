@@ -87,14 +87,12 @@ class WorldModel(nn.Module):
             reward_sequence_batch: torch.tensor, 
             continue_sequence_batch: torch.tensor
         ):
-        prior_logits = []
-        posterior_logits = []
-        obs_log_lh = []
-        rew_log_lh = []
-        cont_log_lh = []
         B = continue_sequence_batch.shape[0]
         hidden_state_batch = torch.zeros(B, 1, self.hidden_dims, dtype=torch.float32, device=self.device)
         posterior_latent_batch = torch.zeros(B, 1, self.latent_num_rows, self.latent_num_columns, dtype=torch.float32, device=self.device)
+        post_latent_list = []
+        hidden_list = []
+        logits_list = []
         for t in range(self.horizon):
             prev_action_batch = action_sequence_batch[:, t-1:t] if t > 0 else torch.zeros(B, 1, self.action_dims, device=self.device)
             posterior_latent_batch, hidden_state_batch, posterior_logits_batch = self.observe_step(
@@ -103,33 +101,36 @@ class WorldModel(nn.Module):
                 prev_action_batch,                    
                 observation_sequence_batch[:, t:t+1] 
             )
-            reward_th_batch = to_twohot(reward_sequence_batch[:, t:t+1], self.reward_predictor.buckets_rew)
+            post_latent_list.append(posterior_latent_batch)
+            hidden_list.append(hidden_state_batch)
+            logits_list.append(posterior_logits_batch)
 
-            prior_latent_logits_batch = self.dynamics_predictor(hidden_state_batch)
-            dec_mu_batch, dec_sig_batch = self.decoder(hidden_state_batch, posterior_latent_batch)
-            reward_logits_batch = self.reward_predictor(hidden_state_batch, posterior_latent_batch) 
-            _, cont_logits_batch = self.continue_predictor(hidden_state_batch, posterior_latent_batch)
+        posterior_logits = torch.cat(logits_list, dim=1) # (B, H, 32, 32)
+        hidden_seq = torch.cat(hidden_list, dim=1)          # (B, H, Hidden)
+        latent_seq = torch.cat(post_latent_list, dim=1)      # (B, H, 32, 32)
 
-            observation_log_likelyhood_batch = gaussian_log_probability(observation_sequence_batch[:, t:t+1], dec_mu_batch, dec_sig_batch)
-            continue_log_likelyhood_batch = torch.nn.functional.binary_cross_entropy_with_logits(
-                cont_logits_batch,
-                continue_sequence_batch[:, t:t+1],
-                reduction='none'
-            )
-            reward_log_probs_batch = torch.nn.functional.log_softmax(reward_logits_batch, dim=-1)
-            reward_log_likelyhood_batch = torch.sum(reward_th_batch * reward_log_probs_batch, dim=-1, keepdim=True)
+        prior_logits = self.dynamics_predictor(hidden_seq)
+        dec_mu, dec_sig = self.decoder(hidden_seq, latent_seq)
+        reward_logits = self.reward_predictor(hidden_seq, latent_seq) 
+        _, cont_logits = self.continue_predictor(hidden_seq, latent_seq)
 
-            posterior_logits.append(posterior_logits_batch)
-            prior_logits.append(prior_latent_logits_batch)
-            obs_log_lh.append(observation_log_likelyhood_batch)
-            rew_log_lh.append(reward_log_likelyhood_batch)
-            cont_log_lh.append(continue_log_likelyhood_batch)
+        obs_targets = observation_sequence_batch[:, :self.horizon]
+        rew_targets = reward_sequence_batch[:, :self.horizon]
+        cont_targets = continue_sequence_batch[:, :self.horizon]
 
-        posterior_logits = torch.stack(posterior_logits, dim=1).squeeze(dim=2)
-        prior_logits = torch.stack(prior_logits, dim=1).squeeze(dim=2)
-        obs_log_lh = torch.stack(obs_log_lh, dim=1).squeeze(dim=2)
-        rew_log_lh = torch.stack(rew_log_lh, dim=1).squeeze(dim=2)
-        cont_log_lh = torch.stack(cont_log_lh, dim=1).squeeze(dim=2)
+        reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
+
+        obs_log_lh = gaussian_log_probability(obs_targets, dec_mu, dec_sig)
+        
+        cont_log_lh = torch.nn.functional.binary_cross_entropy_with_logits(
+            cont_logits,
+            cont_targets,
+            reduction='none'
+        )
+        
+        reward_log_probs = torch.nn.functional.log_softmax(reward_logits, dim=-1)
+        rew_log_lh = torch.sum(reward_th * reward_log_probs, dim=-1, keepdim=True)
+
         return (
             prior_logits, 
             posterior_logits, 
@@ -137,7 +138,7 @@ class WorldModel(nn.Module):
             rew_log_lh, 
             cont_log_lh
         )
-
+    
     def training_step(
             self, 
             observation_sequences: torch.tensor, 
