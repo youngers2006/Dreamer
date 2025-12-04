@@ -17,6 +17,9 @@ def main(config):
         device=device
     )
 
+    os.makedirs('./models', exist_ok=True)
+    os.makedirs('./logs', exist_ok=True)
+
     env_id = config['env_id']
     env = gym.make(env_id, continuous=True)
     evaluation_env = gym.make(env_id, continuous=True)

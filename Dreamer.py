@@ -319,7 +319,7 @@ class Dreamer(nn.Module):
             actor_loss, critic_loss = self.train_Agent()
             WM_loss_list.append(WM_loss) ; actor_loss_list.append(actor_loss) ; critic_loss_list.append(critic_loss)
 
-            if iter % 100 == 0: # Save every 100 iterations
+            if iter % 1000 == 0: # Save every 1000 iterations
                 # Save Model
                 save_path = os.path.join('./models', f'agent_checkpoint_{iter}.pth')
                 self.save_trained_Dreamer(save_path)
