@@ -52,8 +52,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             eps=C_eps
         )
         self.scalar = torch.amp.GradScaler()
-        #self.compute_batched_R_lambda_returns_compiled = torch.compile(self.compute_batched_R_lambda_returns)
-        self.compute_batched_R_lambda_returns_compiled = self.compute_batched_R_lambda_returns
+        self.compute_batched_R_lambda_returns_compiled = torch.compile(self.compute_batched_R_lambda_returns)
     
     def update_S(self, lambda_returns: torch.tensor):
         flat_returns = lambda_returns.detach().flatten()
@@ -91,7 +90,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
             loss_actor = -torch.mean(loss_batched_seq_actor)
 
-            critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
+            critic_logits = self.critic(h_batch_seq, z_batch_seq)[:, :-1]
 
             target_returns = R_lambda_batch_seq.detach()
             R_lambda_th_batch_seq = to_twohot(target_returns, self.critic.buckets_crit)
@@ -99,16 +98,12 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
             loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
             loss_critic = torch.mean(loss_batched_seq_critic)
- 
-        print(f"Critic Logits Grad: {critic_logits.requires_grad}")
-        print(f"Critic Loss Grad: {loss_critic.requires_grad}")
-        print(f"Critic Params Grad: {self.critic.value_net[0].weight.requires_grad}")
+
+        self.critic_optimiser.zero_grad()
+        self.scalar.scale(loss_critic).backward()
 
         self.actor_optimiser.zero_grad()
-        self.critic_optimiser.zero_grad()
-
         self.scalar.scale(loss_actor).backward()
-        self.scalar.scale(loss_critic).backward()
 
         self.scalar.unscale_(self.actor_optimiser)
         self.scalar.unscale_(self.critic_optimiser)
