@@ -67,8 +67,7 @@ class WorldModel(nn.Module):
             eps=WM_eps
         )
         self.scalar = torch.amp.GradScaler()
-        # self.unroll_model_compiled = torch.compile(self.unroll_model)
-        self.unroll_model_compiled = self.unroll_model
+        self.unroll_model_compiled = torch.compile(self.unroll_model)
 
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(latent_state, hidden_state, action)
