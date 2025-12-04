@@ -52,7 +52,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             eps=C_eps
         )
         self.scalar = torch.amp.GradScaler()
-        self.compute_batched_R_lambda_returns_compiled = torch.compile(self.compute_batched_R_lambda_returns)
+        #self.compute_batched_R_lambda_returns_compiled = torch.compile(self.compute_batched_R_lambda_returns)
+        self.compute_batched_R_lambda_returns_compiled = self.compute_batched_R_lambda_returns
     
     def update_S(self, lambda_returns: torch.tensor):
         flat_returns = lambda_returns.detach().flatten()
