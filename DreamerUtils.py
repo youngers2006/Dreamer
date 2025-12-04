@@ -44,7 +44,7 @@ def to_twohot(value: torch.tensor, buckets: torch.tensor):
     twohot = torch.scatter(twohot, dim=-1, index=(lower_bucket_idx + 1), src=weight)
     return twohot
 
-def _sanitize_for_save(self, data_list):
+def _sanitize_for_save(data_list):
         """Helper to recursively convert GPU tensors to CPU floats/arrays"""
         clean_data = []
         for item in data_list:

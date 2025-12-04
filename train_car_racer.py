@@ -8,6 +8,7 @@ import numpy as np
 import os
 import yaml
 import argparse
+from DreamerUtils import _sanitize_for_save
 torch.set_float32_matmul_precision('high')
 
 def main(config): 
@@ -37,10 +38,10 @@ def main(config):
     save_path = os.path.join(output_dir, 'training_logs.npz')
     np.savez(
         save_path,
-        world_model_loss=np.array(WM_loss_list),
-        actor_loss=np.array(actor_loss_list),
-        critic_loss=np.array(critic_loss_list),
-        rewards=np.array(evaluation_list)
+        world_model_loss=_sanitize_for_save(WM_loss_list),
+        actor_loss=_sanitize_for_save(actor_loss_list),
+        critic_loss=_sanitize_for_save(critic_loss_list),
+        rewards=_sanitize_for_save(evaluation_list)
     )
 
 if __name__ == "__main__":
