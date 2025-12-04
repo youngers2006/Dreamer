@@ -64,7 +64,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.S = (1.0 - alpha) * self.S + alpha * range
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
-        with torch.autocast(device_type=self.device.type, dtype=torch.float16):
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
             R_lambda_batch_seq = self.compute_batched_R_lambda_returns_compiled(
                     h_batch_seq,
                     z_batch_seq,
@@ -90,15 +90,14 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
             loss_actor = -torch.mean(loss_batched_seq_actor)
 
-            with torch.set_grad_enabled(True):
-                critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
+            critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
 
-                target_returns = R_lambda_batch_seq.detach()
-                R_lambda_th_batch_seq = to_twohot(target_returns, self.critic.buckets_crit)
+            target_returns = R_lambda_batch_seq.detach()
+            R_lambda_th_batch_seq = to_twohot(target_returns, self.critic.buckets_crit)
 
-                value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
-                loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
-                loss_critic = torch.mean(loss_batched_seq_critic)
+            value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
+            loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
+            loss_critic = torch.mean(loss_batched_seq_critic)
  
         print(f"Critic Logits Grad: {critic_logits.requires_grad}")
         print(f"Critic Loss Grad: {loss_critic.requires_grad}")
