@@ -51,8 +51,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             betas=(C_betas[0], C_betas[1]),
             eps=C_eps
         )
-        self.scalar = torch.amp.GradScaler()
-        self.compute_batched_R_lambda_returns_compiled = torch.compile(self.compute_batched_R_lambda_returns)
+        self.scalar_actor = torch.amp.GradScaler()
+        self.scalar_critic = torch.amp.GradScaler()
     
     def update_S(self, lambda_returns: torch.tensor):
         flat_returns = lambda_returns.detach().flatten()
@@ -65,7 +65,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
         with torch.autocast(device_type='cuda', dtype=torch.float16):
-            R_lambda_batch_seq = self.compute_batched_R_lambda_returns_compiled(
+            R_lambda_batch_seq = self.compute_batched_R_lambda_returns(
                     h_batch_seq,
                     z_batch_seq,
                     reward_batch_seq,
@@ -100,20 +100,21 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             loss_critic = torch.mean(loss_batched_seq_critic)
 
         self.critic_optimiser.zero_grad()
-        self.scalar.scale(loss_critic).backward()
+        self.scalar_critic.scale(loss_critic).backward(retain_graph=True)
 
         self.actor_optimiser.zero_grad()
-        self.scalar.scale(loss_actor).backward()
+        self.scalar_actor.scale(loss_actor).backward()
 
-        self.scalar.unscale_(self.actor_optimiser)
-        self.scalar.unscale_(self.critic_optimiser)
+        self.scalar_actor.unscale_(self.actor_optimiser)
+        self.scalar_critic.unscale_(self.critic_optimiser)
 
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 100.0)
         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 100.0)
 
-        self.scalar.step(self.actor_optimiser)
-        self.scalar.step(self.critic_optimiser)
-        self.scalar.update()
+        self.scalar_actor.step(self.actor_optimiser)
+        self.scalar_critic.step(self.critic_optimiser)
+        self.scalar_actor.update()
+        self.scalar_critic.update()
         return loss_actor, loss_critic
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):

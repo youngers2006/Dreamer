@@ -67,7 +67,6 @@ class WorldModel(nn.Module):
             eps=WM_eps
         )
         self.scalar = torch.amp.GradScaler()
-        self.unroll_model_compiled = torch.compile(self.unroll_model)
 
     def imagine_step(self, hidden_state, latent_state, action):
         next_hidden_state = self.sequence_model(latent_state, hidden_state, action)
@@ -153,7 +152,7 @@ class WorldModel(nn.Module):
         c_slice = continue_sequences[:, :self.horizon]
 
         with torch.autocast(device_type=self.device.type, dtype=torch.float16):
-            prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model_compiled(
+            prior_logits, posterior_logits, obs_log_lh, rew_log_lh, cont_log_lh = self.unroll_model(
                 obs_slice,
                 a_slice,
                 r_slice,
