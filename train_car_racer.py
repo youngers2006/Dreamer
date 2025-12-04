@@ -24,12 +24,12 @@ def main(config):
     evaluation_env = ResizeObservation(evaluation_env, tuple(config['observation_dims']))
 
     WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list = dreamer_agent.train_dreamer(env, evaluation_env)
-    model_dir = os.environ.get('SM_MODEL_DIR', '/opt/ml/model')
+    model_dir = os.environ.get('SM_MODEL_DIR', './models')
     os.makedirs(model_dir, exist_ok=True)
     save_path = os.path.join(model_dir, 'agent.pth')
     dreamer_agent.save_trained_Dreamer(save_path)
 
-    output_dir = os.environ.get('SM_OUTPUT_DATA_DIR', '/opt/ml/output/data/')
+    output_dir = os.environ.get('SM_OUTPUT_DATA_DIR', './logs')
     os.makedirs(output_dir, exist_ok=True)
     save_path = os.path.join(output_dir, 'training_logs.npz')
     np.savez(
