@@ -317,7 +317,10 @@ class Dreamer(nn.Module):
             self.rollout_policy(env, random_policy=False)
             WM_loss = self.train_world_model()
             actor_loss, critic_loss = self.train_Agent()
-            WM_loss_list.append(WM_loss) ; actor_loss_list.append(actor_loss) ; critic_loss_list.append(critic_loss)
+
+            WM_loss_list.append([l.detach().cpu().item() for l in WM_loss])
+            actor_loss_list.append(actor_loss.detach().cpu().item())
+            critic_loss_list.append(critic_loss.detach().cpu().item())
 
             if iter % 1000 == 0: # Save every 1000 iterations
                 # Save Model
@@ -340,8 +343,8 @@ class Dreamer(nn.Module):
 
             if iter % 20 == 0:
                 eval_reward = self.evaluate_agent(eval_env, eval_episodes=3)
-                evaluation_list.append(eval_reward)
+                evaluation_list.append(eval_reward.detach().cpu().item())
         print("Training Complete.")
         eval_reward = self.evaluate_agent(eval_env, eval_episodes=10)
-        evaluation_list.append(eval_reward)
+        evaluation_list.append(eval_reward.detach().cpu().item())
         return WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list
