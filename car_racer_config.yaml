@@ -27,7 +27,7 @@ device: 'cuda'
 # Training Hyperparameters
 horizon: 15
 batch_size: 30
-nu: 0.995
+nu: 0.0003
 lambda_: 0.95
 gamma: 0.99
 buffer_size: 200000
@@ -46,7 +46,7 @@ world_model_lr: 0.0001
 world_model_betas: [0.9,0.999]
 world_model_eps: 0.0000001
 WM_epochs: 1
-beta_prediction: 0.1
+beta_prediction: 1.0
 beta_dynamics: 0.5
 beta_representation: 0.1
 critic_reward_buckets: 255
