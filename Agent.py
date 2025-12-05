@@ -135,10 +135,10 @@ class Actor(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.base_net = nn.Sequential(
             nn.Linear(in_features=latent_row_dim * latent_column_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
-            nn.LayerNorm(hidden_layer_num_nodes_1),
+            nn.LayerNorm(hidden_layer_num_nodes_1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_num_nodes_1, out_features=hidden_layer_num_nodes_2, device=device),
-            nn.LayerNorm(hidden_layer_num_nodes_2),
+            nn.LayerNorm(hidden_layer_num_nodes_2, device=device),
             nn.SiLU()
         )
         self.mu_head = nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=action_dim, device=device)
@@ -172,10 +172,10 @@ class Critic(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.value_net = nn.Sequential(
             nn.Linear(in_features=latent_column_dim * latent_row_dim + hidden_state_dim, out_features=hidden_layer_num_nodes_1, device=device),
-            nn.LayerNorm(hidden_layer_num_nodes_1),
+            nn.LayerNorm(hidden_layer_num_nodes_1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_num_nodes_1, out_features=hidden_layer_num_nodes_2, device=device),
-            nn.LayerNorm(hidden_layer_num_nodes_2),
+            nn.LayerNorm(hidden_layer_num_nodes_2, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=num_buckets, device=device)
         )

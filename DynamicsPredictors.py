@@ -14,10 +14,10 @@ class DynamicsPredictor(nn.Module):
         self.device = device
         self.logit_net = nn.Sequential(
             nn.Linear(in_features=hidden_state_size, out_features=hidden_L1, device=device),
-            nn.LayerNorm(hidden_L1),
+            nn.LayerNorm(hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
-            nn.LayerNorm(hidden_L2),
+            nn.LayerNorm(hidden_L2, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
         )
@@ -50,10 +50,10 @@ class RewardPredictor(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.logit_net = nn.Sequential(
             nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
-            nn.LayerNorm(hidden_L1),
+            nn.LayerNorm(hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
-            nn.LayerNorm(hidden_L2),
+            nn.LayerNorm(hidden_L2, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=num_buckets, device=device)
         )
@@ -83,10 +83,10 @@ class ContinuePredictor(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.logit_generator = nn.Sequential(
             nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
-            nn.LayerNorm(hidden_L1),
+            nn.LayerNorm(hidden_L1, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
-            nn.LayerNorm(hidden_L2),
+            nn.LayerNorm(hidden_L2, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=1, device=device)
         )

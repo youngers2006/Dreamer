@@ -24,7 +24,7 @@ class Encoder(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.latent_mapper = nn.Sequential(
             nn.Linear(in_features=total_in_features, out_features=hidden_layer_nodes, device=device),
-            nn.LayerNorm(hidden_layer_nodes),
+            nn.LayerNorm(hidden_layer_nodes, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
         )
