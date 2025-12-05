@@ -31,6 +31,17 @@ class Buffer:
         
         valid_starts_index = self.size - self.sequence_length + 1
         start_index = np.random.randint(0, valid_starts_index, size=batch_size)
+        
+        if self.size == self.capacity:
+            valid_indices = []
+            for idx in start_index:
+                end_idx = idx + self.sequence_length
+                if idx < self.next_idx < end_idx:
+                    new_idx = np.random.randint(0, valid_starts_index) 
+                    valid_indices.append(new_idx) 
+                else:
+                    valid_indices.append(idx)
+            start_index = np.array(valid_indices)
         indices = start_index[:, None] + np.arange(self.sequence_length)[None, :]
 
         observations = self.observation_buffer[indices]
