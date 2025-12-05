@@ -24,6 +24,7 @@ class Encoder(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.latent_mapper = nn.Sequential(
             nn.Linear(in_features=total_in_features, out_features=hidden_layer_nodes, device=device),
+            nn.LayerNorm(hidden_layer_nodes),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
         )
@@ -42,10 +43,14 @@ class Encoder(nn.Module):
     def encode(self, hidden_state, observation):
         B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state, observation)
-        dist = torch.distributions.Categorical(logits=logits)
+        logits = logits.view(B, S, self.latent_num_rows, self.latent_num_columns)
+        probs = torch.softmax(logits, dim=-1)
+        uniform = (1.0 / self.latent_num_columns)
+        probs = 0.99 * probs + 0.01 * uniform
+        dist = torch.distributions.Categorical(probs=probs)
         sampled_idx = dist.sample()
-        latent_state_flat = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_size)
-        latent_state = latent_state_flat.view(B, S, self.latent_num_rows, self.latent_num_columns)
+        latent_state_OH = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_num_columns).float()
+        latent_state = latent_state_OH + probs - probs.detach()
         return latent_state, logits
 
 class Decoder(nn.Module):

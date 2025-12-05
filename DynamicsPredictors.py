@@ -14,8 +14,10 @@ class DynamicsPredictor(nn.Module):
         self.device = device
         self.logit_net = nn.Sequential(
             nn.Linear(in_features=hidden_state_size, out_features=hidden_L1, device=device),
+            nn.LayerNorm(hidden_L1),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
+            nn.LayerNorm(hidden_L2),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=self.latent_size, device=device)
         )
@@ -27,9 +29,13 @@ class DynamicsPredictor(nn.Module):
     def predict(self, hidden_state: torch.tensor):
         B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state)
-        dist = torch.distributions.Categorical(logits=logits)
+        probs = torch.softmax(logits, dim=-1)
+        uniform = (1.0 / self.latent_num_columns)
+        probs = 0.99 * probs + 0.01 * uniform
+        dist = torch.distributions.Categorical(probs=probs)
         sample_idx = dist.sample()
         latent_state_flat = torch.nn.functional.one_hot(sample_idx, num_classes=self.latent_size)
+        latent_state_flat = latent_state_flat + probs - probs.detach()
         latent_state = latent_state_flat.view(B, S, self.latent_num_rows, self.latent_num_columns)
         return latent_state, logits
     
@@ -45,8 +51,10 @@ class RewardPredictor(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.logit_net = nn.Sequential(
             nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
+            nn.LayerNorm(hidden_L1),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
+            nn.LayerNorm(hidden_L2),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=num_buckets, device=device)
         )
@@ -76,8 +84,10 @@ class ContinuePredictor(nn.Module):
         self.flatten = nn.Flatten(start_dim=2)
         self.logit_generator = nn.Sequential(
             nn.Linear(in_features=hidden_state_size + self.latent_size, out_features=hidden_L1, device=device),
+            nn.LayerNorm(hidden_L1),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L1, out_features=hidden_L2, device=device),
+            nn.LayerNorm(hidden_L2),
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=1, device=device)
         )
