@@ -147,6 +147,7 @@ class WorldModel(nn.Module):
             continue_sequences: torch.tensor
         ): # (batch_size, sequence_length, features)
 
+        observation_sequences = (observation_sequences.float() / 255.0) - 0.5
         obs_slice = observation_sequences[:, :self.horizon]
         a_slice = action_sequences[:, :self.horizon]
         r_slice = reward_sequences[:, :self.horizon]
@@ -175,7 +176,7 @@ class WorldModel(nn.Module):
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
-        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
+        nn.utils.clip_grad_norm_(self.parameters(), 10.0)
         self.scalar.step(self.optimiser)
         self.scalar.update()
 

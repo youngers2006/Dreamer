@@ -176,7 +176,8 @@ class Dreamer(nn.Module):
         with torch.no_grad():
             observation, _ = env.reset(seed=self.seed)
             observation = observation.transpose(2,0,1).astype(np.uint8)
-            observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+            obs_normalised = (observation.astype(np.float32) / 255.0) - 0.5
+            observation_tensor = torch.tensor(obs_normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
             continue_ = True
             hidden_state = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
             latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
@@ -191,17 +192,19 @@ class Dreamer(nn.Module):
                     action_np = action.detach().cpu().numpy().squeeze()
                 observation_, reward, terminated, truncated, _ = env.step(action_np)
                 observation_ = observation_.transpose(2,0,1).astype(np.uint8)
-                observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+                obs__normalised = (observation_.astype(np.float32) / 255.0) - 0.5
+                observation__tensor = torch.tensor(obs__normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
                 done = (terminated or truncated)
                 continue_ = (1 - terminated)
                 self.buffer.add_to_buffer(observation, action_np, reward, continue_)
                 if done:
                     self.seed += 1
                     observation, _ = env.reset(seed=self.seed)
-                    observation = observation.transpose(2,0,1)[np.newaxis, :].astype(np.uint8)
-                    observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
+                    observation = observation.transpose(2,0,1).astype(np.uint8)
+                    obs_normalised = (observation.astype(np.float32) / 255.0) - 0.5
+                    observation_tensor = torch.tensor(obs_normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
                     continue_ = True
-                    hidden_state = torch.zeros(1, 1, self.hidden_state_dims)
+                    hidden_state = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
                     latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
                 else:
                     latent_state, hidden_state, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
