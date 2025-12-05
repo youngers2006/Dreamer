@@ -43,6 +43,7 @@ class Buffer:
                     valid_indices.append(idx)
             start_index = np.array(valid_indices)
         indices = start_index[:, None] + np.arange(self.sequence_length)[None, :]
+        indices = indices % self.capacity
 
         observations = self.observation_buffer[indices]
         actions = self.action_buffer[indices]
