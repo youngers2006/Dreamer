@@ -35,7 +35,7 @@ sequence_length: 50
 seed: 42
 training_iterations: 20000
 random_iterations: 50
-actor_lr: 0.00004
+actor_lr: 0.00003
 actor_betas: [0.9,0.999]
 actor_eps: 0.0000001
 critic_lr: 0.0001
@@ -48,5 +48,5 @@ world_model_eps: 0.0000001
 WM_epochs: 1
 beta_prediction: 0.1
 beta_dynamics: 0.5
-beta_representation: 1.0
+beta_representation: 0.1
 critic_reward_buckets: 255
