@@ -189,11 +189,11 @@ class Dreamer(nn.Module):
                 else:
                     action, _, _ = self.agent.actor.act(hidden_state, latent_state, deterministic=False)
                     action_np = action.detach().cpu().numpy().squeeze()
-                observation_, reward, terminated, _, _ = env.step(action_np)
+                observation_, reward, terminated, truncated, _ = env.step(action_np)
                 observation_ = observation_.transpose(2,0,1).astype(np.uint8)
                 observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
-                done = (terminated)
-                continue_ = (1 - done)
+                done = (terminated or truncated)
+                continue_ = (1 - terminated)
                 self.buffer.add_to_buffer(observation, action_np, reward, continue_)
                 if done:
                     self.seed += 1

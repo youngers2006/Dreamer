@@ -24,19 +24,18 @@ class DynamicsPredictor(nn.Module):
 
     def forward(self, x):
         logits = self.logit_net(x)
+        logits = logits.view(-1, 1, self.latent_num_rows, self.latent_num_columns)
         return logits
     
     def predict(self, hidden_state: torch.tensor):
-        B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state)
         probs = torch.softmax(logits, dim=-1)
         uniform = (1.0 / self.latent_num_columns)
         probs = 0.99 * probs + 0.01 * uniform
         dist = torch.distributions.Categorical(probs=probs)
         sample_idx = dist.sample()
-        latent_state_flat = torch.nn.functional.one_hot(sample_idx, num_classes=self.latent_size)
-        latent_state_flat = latent_state_flat + probs - probs.detach()
-        latent_state = latent_state_flat.view(B, S, self.latent_num_rows, self.latent_num_columns)
+        latent_state_OH = torch.nn.functional.one_hot(sample_idx, num_classes=self.latent_num_columns).float()
+        latent_state = latent_state_OH + probs - probs.detach()
         return latent_state, logits
     
 class RewardPredictor(nn.Module):
