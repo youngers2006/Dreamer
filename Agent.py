@@ -69,23 +69,22 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 continue_batch_seq,
                 continue_batch_seq.shape[1]
             )
-        with torch.no_grad():
-            value_batched_seq = self.critic.value(h_batch_seq, z_batch_seq)
-            advantage_batched_seq = R_lambda_batch_seq - value_batched_seq[:, :-1]
-            advantage_batched_seq = advantage_batched_seq.squeeze(-1)
+        value_batched_seq = self.critic.value(h_batch_seq, z_batch_seq)
+        baseline = value_batched_seq[:, :-1].detach()
+        advantage_batched_seq = R_lambda_batch_seq - baseline
+        advantage_batched_seq = advantage_batched_seq.squeeze(-1)
 
         base_dist = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
         a_dist_batch_seq = TransformedDistribution(base_dist, [TanhTransform()])
 
         log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq).sum(dim=-1)
         log_prob_batch_seq = log_prob_batch_seq[:, :-1]
-
-        actor_entropy_batched_seq = - log_prob_batch_seq
+        actor_entropy = -log_prob_batch_seq
 
         self.update_S(R_lambda_batch_seq)
-        normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device))
+        normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device)).detach()
 
-        loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy_batched_seq
+        loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy
         loss_actor = -torch.mean(loss_batched_seq_actor)
 
         critic_logits = self.critic(h_batch_seq, z_batch_seq)[:, :-1]
@@ -111,8 +110,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         return loss_actor, loss_critic
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
-        with torch.no_grad():
-            value_estimate_seq = self.critic.value(hidden_state_batched_seq, latent_state_batched_seq)
+        value_estimate_seq = self.critic.value(hidden_state_batched_seq, latent_state_batched_seq)
         next_return = value_estimate_seq[:, -1]
         R_lambda_seq = []
         for t in reversed(range(seq_length - 1)):
