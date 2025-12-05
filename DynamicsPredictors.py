@@ -24,7 +24,8 @@ class DynamicsPredictor(nn.Module):
 
     def forward(self, x):
         logits = self.logit_net(x)
-        logits = logits.view(-1, 1, self.latent_num_rows, self.latent_num_columns)
+        B, S, _ = logits.shape
+        logits = logits.view(B, S, self.latent_num_rows, self.latent_num_columns)
         return logits
     
     def predict(self, hidden_state: torch.tensor):
