@@ -52,7 +52,7 @@ class WorldModel(nn.Module):
         self.beta_rep = beta_rep
         self.batch_size = batch_size
 
-        self.encoder = Encoder(hidden_dims, latent_dims[0], latent_dims[1], num_encoder_filters_1, num_encoder_filters_2, encoder_hidden_layer_nodes, device=device)
+        self.encoder = Encoder(observation_dims, hidden_dims, latent_dims[0], latent_dims[1], num_encoder_filters_1, num_encoder_filters_2, encoder_hidden_layer_nodes, device=device)
         self.sequence_model = SequenceModel(latent_dims[0], latent_dims[1], hidden_dims, action_dims, num_layers=1, device=device)
         self.dynamics_predictor = DynamicsPredictor(latent_dims[0], latent_dims[1], hidden_dims, dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, device)
         self.reward_predictor = RewardPredictor(latent_dims[0], latent_dims[1], hidden_dims, rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2, reward_buckets, device=device)

@@ -8,6 +8,6 @@ class CarRacerAdaptor(gym.ActionWrapper):
 
     def action(self, action):
         steering = action[0]
-        gas = (action[1] + 1) / 2
-        brake = (action[2] + 1) / 2
+        gas = max(0, action[1])
+        brake = max(0, action[2])
         return np.array([steering, gas, brake])
