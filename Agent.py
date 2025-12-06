@@ -87,7 +87,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy
         loss_actor = -torch.mean(loss_batched_seq_actor)
 
-        critic_logits = self.critic(h_batch_seq, z_batch_seq)[:, :-1]
+        critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
 
         target_returns = R_lambda_batch_seq.detach()
         R_lambda_th_batch_seq = to_twohot(target_returns, self.critic.buckets_crit)
