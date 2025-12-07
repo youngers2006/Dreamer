@@ -9,7 +9,7 @@ import os
 import yaml
 import argparse
 from DreamerUtils import _sanitize_for_save
-from Adaptors import CarRacerAdaptor
+from Adaptors import CarRacerAdaptor, ActionRepeat
 torch.set_float32_matmul_precision('high')
 
 def main(config): 
@@ -28,8 +28,8 @@ def main(config):
     env = ResizeObservation(env, tuple(config['observation_dims']))
     evaluation_env = ResizeObservation(evaluation_env, tuple(config['observation_dims']))
 
-    env = CarRacerAdaptor(env)
-    evaluation_env = CarRacerAdaptor(evaluation_env)
+    env = ActionRepeat(CarRacerAdaptor(env), repeat=4)
+    evaluation_env = ActionRepeat(CarRacerAdaptor(evaluation_env), repeat=4)
 
     WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list = dreamer_agent.train_dreamer(env, evaluation_env)
     model_dir = os.environ.get('SM_MODEL_DIR', './models')

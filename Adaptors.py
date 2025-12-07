@@ -11,3 +11,27 @@ class CarRacerAdaptor(gym.ActionWrapper):
         gas = max(0, action[1])
         brake = max(0, action[2])
         return np.array([steering, gas, brake])
+    
+class ActionRepeat(gym.Wrapper):
+    def __init__(self, env, repeat=4):
+        super().__init__(env)
+        self.repeat = repeat
+
+    def step(self, action):
+        total_reward = 0.0
+        done = False
+        truncated = False
+        last_obs = None
+        last_info = {}
+        
+        for _ in range(self.repeat):
+            obs, reward, d, t, info = self.env.step(action)
+            total_reward += reward
+            done = done or d
+            truncated = truncated or t
+            last_obs = obs
+            last_info = info
+            if done or truncated:
+                break
+        
+        return last_obs, total_reward, done, truncated, last_info

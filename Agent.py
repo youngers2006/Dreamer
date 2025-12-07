@@ -141,6 +141,8 @@ class Actor(nn.Module):
         )
         self.mu_head = nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=action_dim, device=device)
         self.log_sig_head = nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=action_dim, device=device)
+        torch.nn.init.zeros_(self.mu_head.weight)
+        torch.nn.init.zeros_(self.mu_head.bias)
 
     def forward(self, ht, zt):
         flattened_zt = self.flatten(zt)
