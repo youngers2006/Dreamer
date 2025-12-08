@@ -33,7 +33,7 @@ gamma: 0.99
 buffer_size: 200000
 sequence_length: 50
 seed: 42
-training_iterations: 30000
+training_iterations: 20000
 random_iterations: 1000
 actor_lr: 0.00008
 actor_betas: [0.9,0.999]
