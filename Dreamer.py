@@ -189,7 +189,7 @@ class Dreamer(nn.Module):
                     action = action.unsqueeze_(0).unsqueeze(0)
                 else:
                     action, _, _ = self.agent.actor.act(hidden_state, latent_state, deterministic=False)
-                    action_np = action.detach().cpu().numpy().squeeze()
+                    action_np = action.detach().cpu().numpy().reshape(-1)
                 observation_, reward, terminated, truncated, _ = env.step(action_np)
                 observation_ = observation_.transpose(2,0,1).astype(np.uint8)
                 obs__normalised = (observation_.astype(np.float32) / 255.0) - 0.5
