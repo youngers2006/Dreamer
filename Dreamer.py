@@ -247,7 +247,8 @@ class Dreamer(nn.Module):
         return latent_batch, hidden_batch
     
     def train_Agent(self):
-        loss_actor_list = [] ; loss_critic_list = []
+        loss_actor_list = []
+        loss_critic_list = []
         for _ in tqdm(range(self.AC_epochs), desc="Training Agent in Dreams", leave=False):
             observation_seq_batch, action_seq_batch, _, _, sequence_length = self.buffer.sample_sequences(batch_size=self.batch_size)
             initial_latent_batch, initial_hidden_batch = self.warm_start_generator(observation_seq_batch, action_seq_batch, sequence_length)
@@ -304,11 +305,13 @@ class Dreamer(nn.Module):
         return reward_list.mean()
     
     def train_dreamer(self, env, eval_env):
-        WM_loss_list = [] ; actor_loss_list = [] ; critic_loss_list = []
+        WM_loss_list = [] 
+        actor_loss_list = [] 
+        critic_loss_list = []
         evaluation_list = []
         print("Starting Training...")
         print("Starting Random Kickstart.")
-        for iter in tqdm(range(self.random_iterations), desc=f"Kickstarting Dreamer Agent.", leave=True):
+        for iter in tqdm(range(self.random_iterations), desc="Kickstarting Dreamer Agent.", leave=True):
             self.rollout_policy(env, random_policy=True)
             WM_loss = self.train_world_model()
             actor_loss, critic_loss = self.train_Agent()
