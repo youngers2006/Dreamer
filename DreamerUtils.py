@@ -29,6 +29,9 @@ def kullback_leibler_divergence_between_gaussians(
 def symlog(x):
     return torch.sign(x) * torch.log(1.0 + torch.abs(x))
 
+def symlog_np(x):
+    return np.sign(x) * np.log(1.0 + np.abs(x))
+
 def symexp(x):
     return torch.sign(x) * (torch.exp(torch.abs(x)) - 1.0)
 

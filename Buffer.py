@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from DreamerUtils import symlog_np
 
 class Buffer:
     def __init__(self, buffer_size, sequence_length, action_size, observation_dims, device='cpu'):
@@ -18,8 +19,11 @@ class Buffer:
     def add_to_buffer(self, observation, action, reward, continue_):
         self.observation_buffer[self.next_idx] = np.array(observation, dtype=np.uint8)
         self.action_buffer[self.next_idx] = np.array(action, dtype=np.float32)
-        self.reward_buffer[self.next_idx] = np.array(reward, dtype=np.float32)
         self.continue_buffer[self.next_idx] = np.array(continue_, dtype=np.float32)
+
+        reward = np.array(reward, dtype=np.float32)
+        reward_symlog = symlog_np(reward)
+        self.reward_buffer[self.next_idx] = reward_symlog
 
         self.next_idx = (self.next_idx + 1) % self.capacity
         if self.size < self.capacity:
