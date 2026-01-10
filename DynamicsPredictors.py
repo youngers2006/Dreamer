@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from DreamerUtils import symexp, symlog
+from DreamerUtils import symexp
 
 class DynamicsPredictor(nn.Module):
     """
