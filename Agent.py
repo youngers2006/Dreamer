@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Normal, TanhTransform, TransformedDistribution
-from DreamerUtils import symexp, to_twohot
+from DreamerUtils import symexp, to_twohot, symlog
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(
@@ -92,7 +92,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
 
         target_returns = R_lambda_batch_seq.detach()
-        R_lambda_th_batch_seq = to_twohot(target_returns, self.critic.buckets_crit)
+        target_returns_symlog = symlog(target_returns)
+        R_lambda_th_batch_seq = to_twohot(target_returns_symlog, self.critic.buckets_crit)
 
         value_log_probs = nn.functional.log_softmax(critic_logits, dim=-1)
         loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
@@ -116,7 +117,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         next_return = value_estimate_seq[:, -1]
         R_lambda_seq = []
         for t in reversed(range(seq_length - 1)):
-            reward_t = reward_batched_seq[:, t]
+            reward_t = symexp(reward_batched_seq[:, t])
             continue_t = continue_batched_seq[:, t]
             value_t_plus_1 = value_estimate_seq[:, t+1]
             if reward_t.dim() == 1:
