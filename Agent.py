@@ -69,23 +69,25 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 continue_batch_seq,
                 continue_batch_seq.shape[1]
             )
-        value_batched_seq = self.critic.value(h_batch_seq, z_batch_seq)
-        baseline = value_batched_seq[:, :-1].detach()
-        advantage_batched_seq = R_lambda_batch_seq - baseline
+        value_batched_seq = self.critic.value(h_batch_seq.detach(), z_batch_seq.detach())
+        baseline = value_batched_seq[:, :-1]
+        advantage_batched_seq = (R_lambda_batch_seq - baseline).detach()
         advantage_batched_seq = advantage_batched_seq.squeeze(-1)
 
         base_dist = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
         a_dist_batch_seq = TransformedDistribution(base_dist, [TanhTransform()])
 
-        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq).sum(dim=-1)
+        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq.detach()).sum(dim=-1)
         log_prob_batch_seq = log_prob_batch_seq[:, :-1]
         actor_entropy = -log_prob_batch_seq
 
         self.update_S(R_lambda_batch_seq)
         normalisation_term = torch.max(self.S, torch.tensor(1.0, dtype=torch.float32, device=self.device)).detach()
+        scaled_advantage = (advantage_batched_seq / normalisation_term)
 
-        loss_batched_seq_actor = (advantage_batched_seq / normalisation_term) + self.nu * actor_entropy
-        loss_actor = -torch.mean(loss_batched_seq_actor)
+        loss_policy = - (log_prob_batch_seq * scaled_advantage)
+        loss_entropy = - (self.nu * actor_entropy)
+        loss_actor = torch.mean(loss_policy + loss_entropy)
 
         critic_logits = self.critic(h_batch_seq.detach(), z_batch_seq.detach())[:, :-1]
 
@@ -102,8 +104,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
 
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 10.0)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 10.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 100.0)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 100.0)
 
         self.critic_optimiser.step()
         self.actor_optimiser.step()
@@ -179,7 +181,7 @@ class Critic(nn.Module):
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_num_nodes_2, out_features=num_buckets, device=device)
         )
-        bucket_values = symexp(torch.linspace(-20, 20, num_buckets, device=device))
+        bucket_values = torch.linspace(-20, 20, num_buckets, device=device)
         self.register_buffer('buckets_crit', bucket_values)
 
     def forward(self, ht, zt):
@@ -191,5 +193,5 @@ class Critic(nn.Module):
     def value(self, ht, zt):
         logits = self.forward(ht, zt)
         probs = torch.nn.functional.softmax(logits, dim=-1)
-        value = torch.sum(probs * self.buckets_crit, dim=-1, keepdim=True)
-        return value 
+        symlog_value = torch.sum(probs * self.buckets_crit, dim=-1, keepdim=True)
+        return symexp(symlog_value) 

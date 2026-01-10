@@ -58,7 +58,7 @@ class RewardPredictor(nn.Module):
             nn.SiLU(),
             nn.Linear(in_features=hidden_L2, out_features=num_buckets, device=device)
         )
-        buckets = symexp(torch.linspace(-20.0, 20.0, num_buckets, device=device))
+        buckets = torch.linspace(-20.0, 20.0, num_buckets, device=device)
         self.register_buffer('buckets_rew', buckets)
     
     def forward(self, hidden, latent):
@@ -70,8 +70,8 @@ class RewardPredictor(nn.Module):
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
         logits = self.forward(hidden_state, latent_state)
         probs = torch.nn.functional.softmax(logits, dim=-1)
-        reward = torch.sum(probs * self.buckets_rew, dim=-1, keepdim=True)
-        return reward
+        symlog_reward = torch.sum(probs * self.buckets_rew, dim=-1, keepdim=True)
+        return symexp(symlog_reward)
     
 class ContinuePredictor(nn.Module):
     """

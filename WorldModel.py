@@ -110,7 +110,7 @@ class WorldModel(nn.Module):
         latent_seq = torch.cat(post_latent_list, dim=1)      # (B, H, 32, 32)
 
         prior_logits = self.dynamics_predictor(hidden_seq)
-        dec_mu, dec_sig = self.decoder(hidden_seq, latent_seq)
+        dec_mu = self.decoder(hidden_seq, latent_seq)
         reward_logits = self.reward_predictor(hidden_seq, latent_seq) 
         _, cont_logits = self.continue_predictor(hidden_seq, latent_seq)
 
@@ -120,7 +120,8 @@ class WorldModel(nn.Module):
 
         reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
 
-        obs_log_lh = gaussian_log_probability(obs_targets, dec_mu, dec_sig)
+        dist = torch.distributions.Normal(loc=dec_mu, scale=1.0)
+        obs_log_lh = dist.log_prob(obs_targets).sum(dim=[-3,-2,-1])
         
         cont_log_lh = torch.nn.functional.binary_cross_entropy_with_logits(
             cont_logits,
@@ -176,7 +177,7 @@ class WorldModel(nn.Module):
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
-        nn.utils.clip_grad_norm_(self.parameters(), 10.0)
+        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
         self.scalar.step(self.optimiser)
         self.scalar.update()
 

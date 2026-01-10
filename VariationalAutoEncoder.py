@@ -88,9 +88,8 @@ class Decoder(nn.Module):
             nn.SiLU(),
             nn.ConvTranspose2d(num_filters_2, num_filters_1, kernel_size=4, stride=2, padding=1, device=device),
             nn.SiLU(),
-            nn.ConvTranspose2d(num_filters_1, 6, kernel_size=4, stride=2, padding=1, device=device)
+            nn.ConvTranspose2d(num_filters_1, 3, kernel_size=4, stride=2, padding=1, device=device)
         )
-        self.softplus = nn.Softplus()
 
     def forward(self, hidden: torch.tensor, latent: torch.tensor):
         B, S, _ = hidden.shape
@@ -100,16 +99,11 @@ class Decoder(nn.Module):
         input = torch.cat((hidden, latent), dim=-1)
         x = self.upscaler(input)
         x = x.view(-1, self.num_filters_start, self.start_height, self.start_width)
-        obs_params = self.image_builder(x)
-        mu, sigma_logits = torch.chunk(obs_params, chunks=2, dim=1)
-        sigma = self.softplus(sigma_logits) + 1e-4
-        _, C, H, W = mu.shape
+        mu = self.image_builder(x)
+        B, S, C, H, W = mu.shape
         mu = mu.view(B, S, C, H, W)
-        sigma = sigma.view(B, S, C, H, W)
-        return mu, sigma
+        return mu
     
     def decode(self, hidden_state: torch.tensor, latent_state: torch.tensor):
-        mu, sigma = self.forward(hidden_state, latent_state)
-        dist = torch.distributions.Independent(torch.distributions.Normal(loc=mu, scale=sigma), 3)
-        observation = dist.rsample()
-        return observation, mu, sigma
+        mu = self.forward(hidden_state, latent_state)
+        return mu
