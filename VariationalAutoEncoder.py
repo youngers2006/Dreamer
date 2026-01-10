@@ -100,7 +100,7 @@ class Decoder(nn.Module):
         x = self.upscaler(input)
         x = x.view(-1, self.num_filters_start, self.start_height, self.start_width)
         mu = self.image_builder(x)
-        B, S, C, H, W = mu.shape
+        _, C, H, W = mu.shape
         mu = mu.view(B, S, C, H, W)
         return mu
     
