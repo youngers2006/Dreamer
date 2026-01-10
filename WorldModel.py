@@ -120,8 +120,8 @@ class WorldModel(nn.Module):
 
         reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
 
-        dist = torch.distributions.Normal(loc=dec_mu, scale=1.0)
-        obs_log_lh = dist.log_prob(obs_targets).sum(dim=[-3,-2,-1])
+        dist = torch.distributions.Normal(loc=dec_mu.float(), scale=1.0)
+        obs_log_lh = dist.log_prob(obs_targets.float()).sum(dim=[-3,-2,-1])
         
         cont_log_lh = torch.nn.functional.binary_cross_entropy_with_logits(
             cont_logits,
@@ -162,10 +162,10 @@ class WorldModel(nn.Module):
                 c_slice
             )
 
-            prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach())
-            posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach())
-            prior_dist = torch.distributions.Categorical(logits=prior_logits)
-            posterior_dist = torch.distributions.Categorical(logits=posterior_logits)
+            prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach().float())
+            posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach().float())
+            prior_dist = torch.distributions.Categorical(logits=prior_logits.float())
+            posterior_dist = torch.distributions.Categorical(logits=posterior_logits.float())
             Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1).mean()
             Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1).mean()
             loss_pred_batch = - obs_log_lh - rew_log_lh.squeeze(-1) - cont_log_lh.squeeze(-1)

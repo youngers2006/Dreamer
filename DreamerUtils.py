@@ -33,7 +33,7 @@ def symlog_np(x):
     return np.sign(x) * np.log(1.0 + np.abs(x))
 
 def symexp(x):
-    return torch.sign(x) * (torch.exp(torch.abs(x)) - 1.0)
+    return torch.sign(x) * (torch.exp(torch.abs(x).float()) - 1.0)
 
 def to_twohot(value: torch.tensor, buckets: torch.tensor):
     clipped_value = torch.clamp(max=buckets.max(), min=buckets.min(), input=value)
