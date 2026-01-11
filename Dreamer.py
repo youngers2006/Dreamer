@@ -195,7 +195,7 @@ class Dreamer(nn.Module):
                 obs__normalised = (observation_.astype(np.float32) / 255.0) - 0.5
                 observation__tensor = torch.tensor(obs__normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
                 done = (terminated or truncated)
-                continue_ = (1 - terminated)
+                continue_ = (1 - done)
                 self.buffer.add_to_buffer(observation, action_np, reward, continue_)
                 if done:
                     self.seed += 1

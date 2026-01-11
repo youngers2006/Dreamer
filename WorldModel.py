@@ -109,14 +109,17 @@ class WorldModel(nn.Module):
         hidden_seq = torch.cat(hidden_list, dim=1)          # (B, H, Hidden)
         latent_seq = torch.cat(post_latent_list, dim=1)      # (B, H, 32, 32)
 
+        pred_hidden_input = hidden_seq[:, 1:]
+        pred_latent_input = latent_seq[:, 1:]
+
         prior_logits = self.dynamics_predictor(hidden_seq)
         dec_mu = self.decoder(hidden_seq, latent_seq)
-        reward_logits = self.reward_predictor(hidden_seq, latent_seq) 
-        _, cont_logits = self.continue_predictor(hidden_seq, latent_seq)
+        reward_logits = self.reward_predictor(pred_hidden_input, pred_latent_input)
+        _, cont_logits = self.continue_predictor(pred_hidden_input, pred_latent_input)
 
         obs_targets = observation_sequence_batch[:, :self.horizon]
-        rew_targets = reward_sequence_batch[:, :self.horizon]
-        cont_targets = continue_sequence_batch[:, :self.horizon]
+        rew_targets = reward_sequence_batch[:, :self.horizon - 1]
+        cont_targets = continue_sequence_batch[:, :self.horizon - 1]
 
         reward_th = to_twohot(symlog(rew_targets), self.reward_predictor.buckets_rew)
 
@@ -133,9 +136,9 @@ class WorldModel(nn.Module):
         rew_log_lh = torch.sum(reward_th * reward_log_probs, dim=-1, keepdim=True)
 
         return (
-            prior_logits, 
-            posterior_logits, 
-            obs_log_lh, 
+            prior_logits[:, 1:], 
+            posterior_logits[:, 1:], 
+            obs_log_lh[:, 1:], 
             rew_log_lh, 
             cont_log_lh
         )
@@ -162,14 +165,22 @@ class WorldModel(nn.Module):
                 c_slice
             )
 
+            mask = continue_sequences[:, :self.horizon - 1]
+            obs_log_lh = obs_log_lh * mask.squeeze(-1)
+            rew_log_lh = rew_log_lh * mask
+
             prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach().float())
             posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach().float())
             prior_dist = torch.distributions.Categorical(logits=prior_logits.float())
             posterior_dist = torch.distributions.Categorical(logits=posterior_logits.float())
-            Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1).mean()
-            Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1).mean()
-            loss_pred_batch = - obs_log_lh - rew_log_lh.squeeze(-1) - cont_log_lh.squeeze(-1)
-            loss_pred = loss_pred_batch.mean()
+
+            Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1)
+            Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1)
+            Dkl_dyn = torch.mean(Dkl_dyn * mask.squeeze(-1))
+            Dkl_rep = torch.mean(Dkl_rep * mask.squeeze(-1))
+
+            denominator = mask.sum() + 1e-5
+            loss_pred = (- obs_log_lh.sum() - rew_log_lh.sum() - cont_log_lh.sum()) / denominator
             loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
             loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
             total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep

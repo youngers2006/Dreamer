@@ -88,7 +88,8 @@ class Decoder(nn.Module):
             nn.SiLU(),
             nn.ConvTranspose2d(num_filters_2, num_filters_1, kernel_size=4, stride=2, padding=1, device=device),
             nn.SiLU(),
-            nn.ConvTranspose2d(num_filters_1, 3, kernel_size=4, stride=2, padding=1, device=device)
+            nn.ConvTranspose2d(num_filters_1, 3, kernel_size=4, stride=2, padding=1, device=device),
+            nn.Tanh()
         )
 
     def forward(self, hidden: torch.tensor, latent: torch.tensor):
