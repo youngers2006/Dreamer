@@ -285,7 +285,8 @@ class Dreamer(nn.Module):
             total_reward = 0
             observation, _ = env.reset(seed=self.seed)
             observation = observation.transpose(2,0,1).astype(np.uint8)
-            observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+            obs_normalised = (observation.astype(np.float32) / 255.0) - 0.5
+            observation_tensor = torch.tensor(obs_normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
             continue_ = True
             hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
             latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
@@ -294,7 +295,8 @@ class Dreamer(nn.Module):
                 action_np = action.detach().cpu().numpy().squeeze(0).squeeze(0)
                 observation_, reward, terminated, truncated, _ = env.step(action_np)
                 observation_ = observation_.transpose(2,0,1).astype(np.uint8)
-                observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+                obs__normalised = (observation_.astype(np.float32) / 255.0) - 0.5
+                observation__tensor = torch.tensor(obs__normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
                 total_reward += reward
                 done = (terminated or truncated)
                 continue_ = (1 - done)
@@ -362,7 +364,8 @@ class Dreamer(nn.Module):
         total_reward = 0
         observation, _ = env.reset(seed=env_seed)
         observation = observation.transpose(2,0,1).astype(np.uint8)
-        observation_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+        obs_normalised = (observation.astype(np.float32) / 255.0) - 0.5
+        observation_tensor = torch.tensor(obs_normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
         continue_ = True
         hidden_state = torch.zeros(self.hidden_state_dims, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
         with torch.no_grad():
@@ -375,7 +378,8 @@ class Dreamer(nn.Module):
             action_np = action.detach().cpu().numpy().squeeze(0).squeeze(0)
             observation_, reward, terminated, truncated, _ = env.step(action_np)
             observation_ = observation_.transpose(2,0,1).astype(np.uint8)
-            observation__tensor = torch.tensor(observation_, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+            obs__normalised = (observation_.astype(np.float32) / 255.0) - 0.5
+            observation__tensor = torch.tensor(obs__normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
             total_reward += reward
             done = (terminated or truncated)
             continue_ = (1 - done)
