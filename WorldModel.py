@@ -7,7 +7,7 @@ from SequenceModel import SequenceModel
 import torch.distributions as distributions
 from torch.distributions import Normal, Bernoulli
 import torch.optim as optim
-from DreamerUtils import gaussian_log_probability, to_twohot
+from DreamerUtils import gaussian_log_probability, to_twohot, symlog
 
 class WorldModel(nn.Module):
     def __init__(
@@ -118,7 +118,7 @@ class WorldModel(nn.Module):
         rew_targets = reward_sequence_batch[:, :self.horizon]
         cont_targets = continue_sequence_batch[:, :self.horizon]
 
-        reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
+        reward_th = to_twohot(symlog(rew_targets), self.reward_predictor.buckets_rew)
 
         dist = torch.distributions.Normal(loc=dec_mu.float(), scale=1.0)
         obs_log_lh = dist.log_prob(obs_targets.float()).sum(dim=[-3,-2,-1])

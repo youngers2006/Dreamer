@@ -35,7 +35,7 @@ class ActionRepeat(gym.Wrapper):
                 break
         
         return last_obs, total_reward, done, truncated, last_info
-    
+
 class PendulumWrapper(gym.ActionWrapper):
     def __init__(self, env):
         super().__init__(env)

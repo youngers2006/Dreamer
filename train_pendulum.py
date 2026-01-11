@@ -9,7 +9,7 @@ import os
 import yaml
 import argparse
 from DreamerUtils import _sanitize_for_save
-from Adaptors import PendulumWrapper
+from Adaptors import PendulumWrapper, ActionRepeat, ExtractImage
 torch.set_float32_matmul_precision('high')
 
 def main(config): 
@@ -29,6 +29,8 @@ def main(config):
     evaluation_env = AddRenderObservation(evaluation_env)
     env = ResizeObservation(env, tuple(config['observation_dims']))
     evaluation_env = ResizeObservation(evaluation_env, tuple(config['observation_dims']))
+    env = ActionRepeat(env, repeat=2)
+    evaluation_env = ActionRepeat(evaluation_env, repeat=2)
 
     WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list = dreamer_agent.train_dreamer(env, evaluation_env)
     model_dir = os.environ.get('SM_MODEL_DIR', './models')

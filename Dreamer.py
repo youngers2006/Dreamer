@@ -234,6 +234,7 @@ class Dreamer(nn.Module):
         Args: observations, actions, from a batch of imagined trajectories, length of the imagined trajectories.
         Returns
         """
+        observation_seq_batch = (observation_seq_batch.float() / 255.0) - 0.5
         hidden_batch = torch.zeros(self.batch_size, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
         latent_batch, _ = self.world_model.encoder.encode(hidden_batch, observation_seq_batch[:, 0:1, :])
         warmup_length = sequence_length // 2

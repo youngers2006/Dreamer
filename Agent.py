@@ -100,7 +100,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         loss_critic = torch.mean(loss_batched_seq_critic)
 
         self.critic_optimiser.zero_grad()
-        loss_critic.backward(retain_graph=True)
+        loss_critic.backward(retain_graph=False)
 
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
@@ -117,7 +117,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         next_return = value_estimate_seq[:, -1]
         R_lambda_seq = []
         for t in reversed(range(seq_length - 1)):
-            reward_t = symexp(reward_batched_seq[:, t])
+            reward_t = reward_batched_seq[:, t]
             continue_t = continue_batched_seq[:, t]
             value_t_plus_1 = value_estimate_seq[:, t+1]
             if reward_t.dim() == 1:
