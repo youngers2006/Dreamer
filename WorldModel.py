@@ -167,9 +167,10 @@ class WorldModel(nn.Module):
 
             mask = continue_sequences[:, :self.horizon - 1]
             ones = torch.ones((mask.shape[0], 1, 1), device=self.device)
-            rew_mask = torch.cat((ones, mask[:, :-1]), dim=1)
+            shift_mask = torch.cat((ones, mask[:, :-1]), dim=1)
             obs_log_lh = obs_log_lh * mask.squeeze(-1)
-            rew_log_lh = rew_log_lh * rew_mask
+            rew_log_lh = rew_log_lh * shift_mask
+            cont_log_lh = cont_log_lh * shift_mask.squeeze(-1)
 
             prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach().float())
             posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach().float())
@@ -178,11 +179,11 @@ class WorldModel(nn.Module):
 
             Dkl_dyn = torch.distributions.kl.kl_divergence(posterior_dist_detached, prior_dist).sum(dim=-1)
             Dkl_rep = torch.distributions.kl.kl_divergence(posterior_dist, prior_dist_detached).sum(dim=-1)
-            Dkl_dyn = torch.mean(Dkl_dyn * rew_mask.squeeze(-1))
-            Dkl_rep = torch.mean(Dkl_rep * rew_mask.squeeze(-1))
+            Dkl_dyn = torch.mean(Dkl_dyn * shift_mask.squeeze(-1))
+            Dkl_rep = torch.mean(Dkl_rep * shift_mask.squeeze(-1))
 
             denominator = mask.sum() + 1e-5
-            loss_pred = (- obs_log_lh.sum() - rew_log_lh.sum() - cont_log_lh.sum()) / denominator
+            loss_pred = (- obs_log_lh.sum() - rew_log_lh.sum() + cont_log_lh.sum()) / denominator
             loss_dyn = torch.max(torch.tensor(1.0, device=self.device), Dkl_dyn)
             loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
             total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
