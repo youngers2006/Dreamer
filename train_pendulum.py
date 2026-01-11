@@ -9,7 +9,7 @@ import os
 import yaml
 import argparse
 from DreamerUtils import _sanitize_for_save
-from Adaptors import PendulumWrapper, ActionRepeat, ExtractImage
+from Adaptors import PendulumWrapper, ActionRepeat
 torch.set_float32_matmul_precision('high')
 
 def main(config): 
