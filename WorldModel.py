@@ -118,8 +118,8 @@ class WorldModel(nn.Module):
         _, cont_logits = self.continue_predictor(pred_hidden_input, pred_latent_input)
 
         obs_targets = observation_sequence_batch[:, :self.horizon]
-        rew_targets = reward_sequence_batch[:, :self.horizon - 1]
-        cont_targets = continue_sequence_batch[:, :self.horizon - 1]
+        rew_targets = reward_sequence_batch[:, 1:self.horizon]
+        cont_targets = continue_sequence_batch[:, 1:self.horizon]
 
         reward_th = to_twohot(symlog(rew_targets), self.reward_predictor.buckets_rew)
 
@@ -165,7 +165,7 @@ class WorldModel(nn.Module):
                 c_slice
             )
 
-            mask = continue_sequences[:, :self.horizon - 1]
+            mask = continue_sequences[:, 1:self.horizon]
             obs_log_lh = obs_log_lh * mask.squeeze(-1)
             rew_log_lh = rew_log_lh * mask 
             cont_log_lh = cont_log_lh * mask
@@ -189,7 +189,7 @@ class WorldModel(nn.Module):
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
-        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
+        nn.utils.clip_grad_norm_(self.parameters(), 10.0)
         self.scalar.step(self.optimiser)
         self.scalar.update()
 

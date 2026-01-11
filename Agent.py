@@ -105,8 +105,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
 
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 100.0)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 100.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 10.0)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 10.0)
 
         self.critic_optimiser.step()
         self.actor_optimiser.step()
