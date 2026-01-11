@@ -167,8 +167,8 @@ class WorldModel(nn.Module):
 
             mask = continue_sequences[:, :self.horizon - 1]
             obs_log_lh = obs_log_lh * mask.squeeze(-1)
-            rew_log_lh = rew_log_lh * mask
-            cont_log_lh = cont_log_lh * mask.squeeze(-1)
+            rew_log_lh = rew_log_lh * mask 
+            cont_log_lh = cont_log_lh * mask
 
             prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach().float())
             posterior_dist_detached = torch.distributions.Categorical(logits=posterior_logits.detach().float())
