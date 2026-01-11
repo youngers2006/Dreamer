@@ -51,7 +51,7 @@ class Encoder(nn.Module):
         B, S, _ = hidden_state.shape
         logits = self.forward(hidden_state, observation)
         logits = logits.view(B, S, self.latent_num_rows, self.latent_num_columns)
-        probs = torch.softmax(logits, dim=-1)
+        probs = torch.softmax(logits.float(), dim=-1)
         uniform = (1.0 / self.latent_num_columns)
         probs = 0.99 * probs + 0.01 * uniform
         dist = torch.distributions.Categorical(probs=probs)
