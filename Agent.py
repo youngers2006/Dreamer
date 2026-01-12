@@ -64,13 +64,15 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             params=self.actor.parameters(),
             lr=A_lr,
             betas=(A_betas[0], A_betas[1]),
-            eps=A_eps
+            eps=A_eps,
+            weight_decay=1e-6
         )
         self.critic_optimiser = torch.optim.AdamW(
             params=self.critic.parameters(),
             lr=C_lr,
             betas=(C_betas[0], C_betas[1]),
-            eps=C_eps
+            eps=C_eps,
+            weight_decay=1e-6
         )
     
     def update_S(self, lambda_returns: torch.tensor):
@@ -107,7 +109,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         base_dist = Normal(loc=a_mu_batch_seq, scale=a_sigma_batch_seq)
         a_dist_batch_seq = TransformedDistribution(base_dist, [TanhTransform()])
 
-        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq.detach()).sum(dim=-1)
+        eps = 1e-6
+        action_batch_seq_clamped = torch.clamp(action_batch_seq.detach(), -1.0 + eps, 1.0 - eps)
+        log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq_clamped).sum(dim=-1)
         log_prob_batch_seq = log_prob_batch_seq[:, :-1]
         actor_entropy = -log_prob_batch_seq
 
@@ -139,8 +143,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
 
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 100.0)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 100.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 10.0)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 10.0)
 
         self.critic_optimiser.step()
         self.actor_optimiser.step()

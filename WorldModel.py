@@ -64,7 +64,8 @@ class WorldModel(nn.Module):
             self.parameters(), 
             lr=WM_lr, 
             betas=(WM_betas[0], WM_betas[1]),  
-            eps=WM_eps
+            eps=WM_eps,
+            weight_decay=1e-6
         )
         self.scalar = torch.amp.GradScaler()
 
@@ -193,7 +194,7 @@ class WorldModel(nn.Module):
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
-        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
+        nn.utils.clip_grad_norm_(self.parameters(), 10.0)
         self.scalar.step(self.optimiser)
         self.scalar.update()
 

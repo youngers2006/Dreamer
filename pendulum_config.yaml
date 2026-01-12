@@ -37,14 +37,14 @@ training_iterations: 500
 random_iterations: 100
 actor_lr: 0.00008
 actor_betas: [0.9,0.999]
-actor_eps: 0.0000001
+actor_eps: 1e-5
 critic_lr: 0.0001
 critic_betas: [0.9,0.999]
-critic_eps: 0.0000001
+critic_eps: 1e-5
 AC_epochs: 10
 world_model_lr: 0.0001
 world_model_betas: [0.9,0.999]
-world_model_eps: 0.0000001
+world_model_eps: 1e-5
 WM_epochs: 10
 beta_prediction: 1.0
 beta_dynamics: 0.5
