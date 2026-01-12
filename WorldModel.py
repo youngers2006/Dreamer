@@ -189,7 +189,7 @@ class WorldModel(nn.Module):
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
-        nn.utils.clip_grad_norm_(self.parameters(), 10.0)
+        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
         self.scalar.step(self.optimiser)
         self.scalar.update()
 

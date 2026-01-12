@@ -136,8 +136,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
 
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 50.0)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 50.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 100.0)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 100.0)
 
         self.critic_optimiser.step()
         self.actor_optimiser.step()
@@ -184,8 +184,12 @@ class Actor(nn.Module):
         flattened_zt = self.flatten(zt)
         st = torch.cat([ht, flattened_zt], dim=-1)
         base_result = self.base_net(st)
+
         mu = self.mu_head(base_result)
+        mu = torch.tanh(mu) * 5.0
+
         log_sig = self.log_sig_head(base_result)
+        log_sig = torch.clamp(log_sig, -5.0, 5.0)
         sigma = torch.nn.functional.softplus(log_sig) + 1e-4
         return mu, sigma
     
