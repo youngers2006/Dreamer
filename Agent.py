@@ -88,8 +88,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
     def soft_update_target(self, tau=0.02):
         with torch.no_grad():
             for p_current, p_target in zip(self.critic.parameters(), self.target_critic.parameters()):
-                p_current.data.mul_(1.0 - tau)
-                p_current.data.add_(tau * p_target.data)
+                p_target.data.mul_(1.0 - tau)
+                p_target.data.add_(tau * p_current.data)
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
         R_lambda_batch_seq = self.compute_batched_R_lambda_returns(

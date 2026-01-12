@@ -39,7 +39,7 @@ class ActionRepeat(gym.Wrapper):
 class PendulumWrapper(gym.ActionWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.action_space = gym.spaces.Box(low=-2, high=2, shape=(1,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
 
     def action(self, action):
         return action * 2.0
