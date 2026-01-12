@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal, TanhTransform, TransformedDistribution
 from DreamerUtils import symexp, to_twohot, symlog
+import copy
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(
@@ -28,8 +29,28 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         ):
         super().__init__()
         self.device = device
-        self.actor = Actor(action_dim, latent_dims[0], latent_dims[1], hidden_state_dim, HL_A1, HL_A2, device=device)
-        self.critic = Critic(latent_dims[0], latent_dims[1], hidden_state_dim, HL_C1, HL_C2, critic_buckets, device=device)
+        self.actor = Actor(
+            action_dim, 
+            latent_dims[0], 
+            latent_dims[1], 
+            hidden_state_dim, 
+            HL_A1, 
+            HL_A2, 
+            device=device
+        )
+        self.critic = Critic(
+            latent_dims[0], 
+            latent_dims[1], 
+            hidden_state_dim, 
+            HL_C1, 
+            HL_C2, 
+            critic_buckets, 
+            device=device
+        )
+        self.target_critic = copy.deepcopy(self.critic)
+
+        for p in self.target_critic.parameters():
+            p.requires_grad = False
 
         self.nu = nu
         self.lambda_ = lambda_
@@ -60,6 +81,12 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         range = torch.max(per095 - per005, torch.tensor(1.0, dtype=torch.float32, device=self.device))
         alpha = (1.0 - self.smoothing_factor)
         self.S = (1.0 - alpha) * self.S + alpha * range
+
+    def soft_update_target(self, tau=0.02):
+        with torch.no_grad():
+            for p_current, p_target in zip(self.critic.parameters(), self.target_critic.parameters()):
+                p_current.data.mul_(1.0 - tau)
+                p_current.data.add_(tau * p_target.data)
 
     def train_step(self, z_batch_seq, h_batch_seq, reward_batch_seq, continue_batch_seq, action_batch_seq, a_mu_batch_seq, a_sigma_batch_seq):
         R_lambda_batch_seq = self.compute_batched_R_lambda_returns(
@@ -99,21 +126,25 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
         loss_critic = torch.mean(loss_batched_seq_critic)
 
+        if torch.isnan(loss_actor) or torch.isnan(loss_critic):
+            print("Agent loss is NAN, skipping update.")
+            return loss_actor, loss_critic
+
         self.critic_optimiser.zero_grad()
         loss_critic.backward(retain_graph=False)
 
         self.actor_optimiser.zero_grad()
         loss_actor.backward()
 
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 10.0)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 10.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 50.0)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 50.0)
 
         self.critic_optimiser.step()
         self.actor_optimiser.step()
         return loss_actor, loss_critic
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
-        value_estimate_seq = self.critic.value(hidden_state_batched_seq, latent_state_batched_seq)
+        value_estimate_seq = self.target_critic.value(hidden_state_batched_seq, latent_state_batched_seq)
         next_return = value_estimate_seq[:, -1]
         R_lambda_seq = []
         for t in reversed(range(seq_length - 1)):
