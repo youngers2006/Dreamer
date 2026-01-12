@@ -74,6 +74,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         )
     
     def update_S(self, lambda_returns: torch.tensor):
+        if torch.isnan(lambda_returns).any() or torch.isinf(lambda_returns).any():
+            return
+        
         flat_returns = lambda_returns.detach().flatten()
         per095 = torch.quantile(flat_returns, 0.95)
         per005 = torch.quantile(flat_returns, 0.05)
@@ -126,8 +129,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         loss_batched_seq_critic = -torch.sum(R_lambda_th_batch_seq * value_log_probs, dim=-1)
         loss_critic = torch.mean(loss_batched_seq_critic)
 
-        if torch.isnan(loss_actor) or torch.isnan(loss_critic):
-            print("Agent loss is NAN, skipping update.")
+        if torch.isnan(loss_actor) or torch.isinf(loss_actor) or torch.isnan(loss_critic) or torch.isinf(loss_critic):
+            print("Agent loss is nan or inf, skipping update.")
             return loss_actor, loss_critic
 
         self.critic_optimiser.zero_grad()
@@ -189,8 +192,8 @@ class Actor(nn.Module):
         mu = torch.tanh(mu) * 5.0
 
         log_sig = self.log_sig_head(base_result)
-        log_sig = torch.clamp(log_sig, -5.0, 5.0)
-        sigma = torch.nn.functional.softplus(log_sig) + 1e-4
+        log_sig = torch.clamp(log_sig, -5.0, 2.0)
+        sigma = torch.nn.functional.softplus(log_sig) + 1e-3
         return mu, sigma
     
     def act(self, ht, zt, deterministic=False):

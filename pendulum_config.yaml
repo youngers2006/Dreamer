@@ -26,8 +26,8 @@ device: 'cuda'
 
 # Training Hyperparameters
 horizon: 30
-batch_size: 30
-nu: 0.0003
+batch_size: 50
+nu: 0.003
 lambda_: 0.95
 gamma: 0.99
 buffer_size: 200000

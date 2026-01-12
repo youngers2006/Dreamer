@@ -186,6 +186,10 @@ class WorldModel(nn.Module):
             loss_rep = torch.max(torch.tensor(1.0, device=self.device), Dkl_rep)
             total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
 
+            if torch.isnan(total_loss) or torch.isinf(total_loss):
+                print("World Model loss is NAN or INF, skipping update.")
+                return total_loss
+
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
