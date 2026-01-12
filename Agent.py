@@ -141,6 +141,8 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
 
         self.critic_optimiser.step()
         self.actor_optimiser.step()
+
+        self.soft_update_target()
         return loss_actor, loss_critic
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
