@@ -189,8 +189,6 @@ class Actor(nn.Module):
         base_result = self.base_net(st)
 
         mu = self.mu_head(base_result)
-        mu = torch.tanh(mu) * 5.0
-
         log_sig = self.log_sig_head(base_result)
         log_sig = torch.clamp(log_sig, -5.0, 2.0)
         sigma = torch.nn.functional.softplus(log_sig) + 1e-3

@@ -101,5 +101,5 @@ class ContinuePredictor(nn.Module):
     
     def predict(self, hidden_state: torch.tensor, latent_state: torch.tensor):
         probability, _ = self.forward(hidden_state, latent_state)
-        continue_ = (probability >= 0.5)
-        return continue_
+        #continue_ = (probability >= 0.5)
+        return probability
