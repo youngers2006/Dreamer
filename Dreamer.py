@@ -136,6 +136,10 @@ class Dreamer(nn.Module):
         self.seed = seed
         self.device = device
 
+        self.agent_obs = None
+        self.agent_hidden = None
+        self.agent_latent = None
+
     def dream_episodes(self, starting_latent_state_batch, starting_hidden_state_batch):
         """
         Purpose: given a starting state use the world model to imagine future trajectories within the horizon.
@@ -174,42 +178,49 @@ class Dreamer(nn.Module):
         Returns: No explicit returns, all collected data is added to the buffer.
         """
         with torch.no_grad():
-            observation, _ = env.reset(seed=self.seed)
-            observation = observation.transpose(2,0,1).astype(np.uint8)
-            obs_normalised = (observation.astype(np.float32) / 255.0) - 0.5
-            observation_tensor = torch.tensor(obs_normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
-            continue_ = True
-            hidden_state = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
-            latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
-            latent_state = latent_state.unsqueeze(0).unsqueeze(0)
+            if self.agent_obs is None:
+                observation, _ = env.reset(seed=self.seed)
+                observation = observation.transpose(2,0,1).astype(np.uint8)
+                self.agent_obs = (observation.astype(np.float32) / 255.0) - 0.5
+                
+                self.agent_hidden = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
+                observation_tensor = torch.tensor(self.agent_obs, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+                self.agent_latent, _ = self.world_model.encoder.encode(self.agent_hidden, observation_tensor)
+                self.agent_latent = self.agent_latent.unsqueeze(0).unsqueeze(0)
+
             for _ in range(self.sequence_length):
                 if random_policy:
                     action_np = env.action_space.sample()
                     action = torch.tensor(action_np, dtype=torch.float32, device=self.device)
                     action = action.unsqueeze_(0).unsqueeze(0)
                 else:
-                    action, _, _ = self.agent.actor.act(hidden_state, latent_state, deterministic=False)
+                    action, _, _ = self.agent.actor.act(self.agent_hidden, self.agent_latent, deterministic=False)
                     action_np = action.detach().cpu().numpy().reshape(-1)
+                
                 observation_, reward, terminated, truncated, _ = env.step(action_np)
+
                 observation_ = observation_.transpose(2,0,1).astype(np.uint8)
                 obs__normalised = (observation_.astype(np.float32) / 255.0) - 0.5
                 observation__tensor = torch.tensor(obs__normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+
                 done = (terminated or truncated)
                 continue_ = (1 - done)
+
                 self.buffer.add_to_buffer(observation, action_np, reward, continue_)
+
                 if done:
                     self.seed += 1
                     observation, _ = env.reset(seed=self.seed)
                     observation = observation.transpose(2,0,1).astype(np.uint8)
-                    obs_normalised = (observation.astype(np.float32) / 255.0) - 0.5
-                    observation_tensor = torch.tensor(obs_normalised, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+                    self.agent_obs = (observation.astype(np.float32) / 255.0) - 0.5
+                    observation_tensor = torch.tensor(self.agent_obs, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+
                     continue_ = True
-                    hidden_state = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
-                    latent_state, _ = self.world_model.encoder.encode(hidden_state, observation_tensor)
+                    self.agent_hidden = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
+                    self.agent_latent, _ = self.world_model.encoder.encode(self.agent_hidden, observation_tensor)
                 else:
-                    latent_state, hidden_state, _ = self.world_model.observe_step(latent_state, hidden_state, action, observation__tensor)
-                    observation = observation_
-                    observation_tensor = observation__tensor
+                    self.agent_obs = obs__normalised
+                    self.agent_latent, self.agent_hidden, _ = self.world_model.observe_step(self.agent_latent, self.agent_hidden, action, observation__tensor)
 
     def train_world_model(self):
         """
