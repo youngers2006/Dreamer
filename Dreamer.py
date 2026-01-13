@@ -186,7 +186,6 @@ class Dreamer(nn.Module):
                 self.agent_hidden = torch.zeros(1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device)
                 observation_tensor = torch.tensor(self.agent_obs, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
                 self.agent_latent, _ = self.world_model.encoder.encode(self.agent_hidden, observation_tensor)
-                self.agent_latent = self.agent_latent.unsqueeze(0).unsqueeze(0)
 
             for _ in range(self.sequence_length):
                 if random_policy:
@@ -206,7 +205,8 @@ class Dreamer(nn.Module):
                 done = (terminated or truncated)
                 continue_ = (1 - done)
 
-                self.buffer.add_to_buffer(observation, action_np, reward, continue_)
+                current_obs_uint8 = ((self.agent_obs + 0.5) * 255.0).astype(np.uint8)
+                self.buffer.add_to_buffer(current_obs_uint8, action_np, reward, continue_)
 
                 if done:
                     self.seed += 1
