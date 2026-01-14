@@ -119,8 +119,8 @@ class WorldModel(nn.Module):
         _, cont_logits = self.continue_predictor(pred_hidden_input, pred_latent_input)
 
         obs_targets = observation_sequence_batch[:, :self.horizon]
-        rew_targets = reward_sequence_batch[:, 1:self.horizon]
-        cont_targets = continue_sequence_batch[:, 1:self.horizon]
+        rew_targets = reward_sequence_batch[:, :self.horizon - 1]
+        cont_targets = continue_sequence_batch[:, :self.horizon - 1]
 
         reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
 
@@ -166,9 +166,9 @@ class WorldModel(nn.Module):
                 c_slice
             )
 
-            mask = continue_sequences[:, 1:self.horizon]
+            mask = continue_sequences[:, :self.horizon - 1]
             obs_log_lh = obs_log_lh * mask.squeeze(-1)
-            rew_log_lh = rew_log_lh * mask 
+            rew_log_lh = rew_log_lh * mask
             cont_log_lh = cont_log_lh * mask
 
             prior_dist_detached = torch.distributions.Categorical(logits=prior_logits.detach().float())
@@ -188,7 +188,7 @@ class WorldModel(nn.Module):
             total_loss = self.beta_pred * loss_pred + self.beta_dyn * loss_dyn + self.beta_rep * loss_rep
 
             if torch.isnan(total_loss) or torch.isinf(total_loss):
-                print("World Model loss is NAN or INF, skipping update.")
+                print("World Model loss is nan or inf, skipping update.")
                 return total_loss
 
         self.optimiser.zero_grad()

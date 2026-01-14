@@ -39,6 +39,7 @@ def symexp(x):
 def to_twohot(value: torch.tensor, buckets: torch.tensor):
     clipped_value = torch.clamp(max=buckets.max(), min=buckets.min(), input=value)
     lower_bucket_idx = torch.searchsorted(buckets, clipped_value, right=True) - 1
+    lower_bucket_idx = torch.clamp(lower_bucket_idx, max=len(buckets) - 2)
     lower_bucket_val = buckets[lower_bucket_idx]
     upper_bucket_val = buckets[lower_bucket_idx + 1]
     weight = (clipped_value - lower_bucket_val) / (upper_bucket_val - lower_bucket_val + 1e-8)
