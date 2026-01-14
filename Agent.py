@@ -154,12 +154,12 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
     
     def compute_batched_R_lambda_returns(self, hidden_state_batched_seq, latent_state_batched_seq, reward_batched_seq, continue_batched_seq, seq_length):
         value_estimate_seq = self.target_critic.value(hidden_state_batched_seq, latent_state_batched_seq)
-        next_return = value_estimate_seq[:, -1]
-        R_lambda_seq = []
+        next_return = reward_batched_seq[:, -1] + self.gamma * continue_batched_seq[:, -1] * value_estimate_seq[:, -1]
+        R_lambda_seq = [next_return]
         for t in reversed(range(seq_length - 1)):
             reward_t = reward_batched_seq[:, t]
             continue_t = continue_batched_seq[:, t]
-            value_t_plus_1 = value_estimate_seq[:, t+1]
+            value_t_plus_1 = value_estimate_seq[:, t + 1]
             if reward_t.dim() == 1:
                 reward_t = reward_t.unsqueeze(-1)
             if continue_t.dim() == 1:
