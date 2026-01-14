@@ -101,6 +101,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 continue_batch_seq,
                 continue_batch_seq.shape[1]
             )
+        R_lambda_batch_seq = R_lambda_batch_seq[:, :-1]
         value_batched_seq = self.critic.value(h_batch_seq.detach(), z_batch_seq.detach())
         baseline = value_batched_seq[:, :-1]
         advantage_batched_seq = (R_lambda_batch_seq - baseline).detach()
