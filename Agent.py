@@ -101,7 +101,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 continue_batch_seq,
                 continue_batch_seq.shape[1]
             )
-        R_lambda_batch_seq = R_lambda_batch_seq[:, :-1]
+        
         value_batched_seq = self.critic.value(h_batch_seq.detach(), z_batch_seq.detach())
         baseline = value_batched_seq[:, :-1]
         advantage_batched_seq = (R_lambda_batch_seq - baseline).detach()
@@ -113,7 +113,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         eps = 1e-6
         action_batch_seq_clamped = torch.clamp(action_batch_seq.detach(), -1.0 + eps, 1.0 - eps)
         log_prob_batch_seq = a_dist_batch_seq.log_prob(action_batch_seq_clamped).sum(dim=-1)
-        log_prob_batch_seq = log_prob_batch_seq[:, :-1]
+        
         actor_entropy = -log_prob_batch_seq
 
         self.update_S(R_lambda_batch_seq)

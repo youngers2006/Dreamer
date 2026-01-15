@@ -162,6 +162,9 @@ class Dreamer(nn.Module):
             rewards.append(reward_batch) ; actions.append(action_batch) ; continues_.append(continue_batch)
             a_mus.append(a_mu_batch) ; a_sigmas.append(a_sigma_batch)
             hidden_state_batch = hidden_state__batch ; latent_state_batch = latent_state__batch
+        
+        hidden_states.append(hidden_state_batch) ; latent_states.append(latent_state_batch)
+        
         latent_states = torch.cat(latent_states, dim=1)
         hidden_states = torch.cat(hidden_states, dim=1)
         actions = torch.cat(actions, dim=1)
