@@ -25,27 +25,27 @@ hidden_layer_critic_2_size: 200
 device: 'cuda'
 
 # Training Hyperparameters
-horizon: 15
-batch_size: 30
+horizon: 30
+batch_size: 50
 nu: 0.0003
 lambda_: 0.95
 gamma: 0.99
 buffer_size: 200000
 sequence_length: 50
 seed: 42
-training_iterations: 20000
-random_iterations: 1000
-actor_lr: 0.00008
+training_iterations: 100
+random_iterations: 20
+actor_lr: 0.0003
 actor_betas: [0.9,0.999]
-actor_eps: 0.0000001
+actor_eps: 0.00001
 critic_lr: 0.0001
 critic_betas: [0.9,0.999]
-critic_eps: 0.0000001
-AC_epochs: 1
+critic_eps: 0.00001
+AC_epochs: 5
 world_model_lr: 0.0001
 world_model_betas: [0.9,0.999]
-world_model_eps: 0.0000001
-WM_epochs: 1
+world_model_eps: 0.00001
+WM_epochs: 5
 beta_prediction: 1.0
 beta_dynamics: 0.5
 beta_representation: 0.1
