@@ -122,7 +122,7 @@ class WorldModel(nn.Module):
         rew_targets = reward_sequence_batch[:, :self.horizon - 1]
         cont_targets = continue_sequence_batch[:, :self.horizon - 1]
 
-        reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
+        reward_th = to_twohot(symlog(rew_targets), self.reward_predictor.buckets_rew)
 
         dist = torch.distributions.Normal(loc=dec_mu.float(), scale=1.0)
         obs_log_lh = dist.log_prob(obs_targets.float()).sum(dim=[-3,-2,-1])
