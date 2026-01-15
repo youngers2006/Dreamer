@@ -9,7 +9,7 @@ import os
 import yaml
 import argparse
 from DreamerUtils import _sanitize_for_save
-from Adaptors import CarRacerAdaptor, ActionRepeat
+from Adaptors import CarRacerAdaptor, ActionRepeat, CropObservation
 torch.set_float32_matmul_precision('high')
 
 def main(config): 
@@ -25,6 +25,10 @@ def main(config):
     env_id = config['env_id']
     env = gym.make(env_id, continuous=True)
     evaluation_env = gym.make(env_id, continuous=True)
+
+    env = CropObservation(env)
+    evaluation_env = CropObservation(evaluation_env)
+
     env = ResizeObservation(env, tuple(config['observation_dims']))
     evaluation_env = ResizeObservation(evaluation_env, tuple(config['observation_dims']))
 

@@ -12,6 +12,19 @@ class CarRacerAdaptor(gym.ActionWrapper):
         brake = (action[2] + 1) / 2
         return np.array([steering, gas, brake])
     
+class CropObservation(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # CarRacing-v2 defaults to 96x96.
+        # We crop the bottom 12 pixels (dashboard), leaving 84x96.
+        self.observation_space = gym.spaces.Box(
+            low=0, high=255, shape=(84, 96, 3), dtype=np.uint8
+        )
+
+    def observation(self, obs):
+        # Keep only the top 84 rows
+        return obs[:84, :, :]
+    
 class ActionRepeat(gym.Wrapper):
     def __init__(self, env, repeat=4):
         super().__init__(env)
@@ -33,13 +46,4 @@ class ActionRepeat(gym.Wrapper):
             last_info = info
             if done or truncated:
                 break
-        
         return last_obs, total_reward, done, truncated, last_info
-
-class PendulumWrapper(gym.ActionWrapper):
-    def __init__(self, env):
-        super().__init__(env)
-        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
-
-    def action(self, action):
-        return action * 2.0
