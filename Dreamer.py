@@ -331,10 +331,7 @@ class Dreamer(nn.Module):
         for iter in tqdm(range(self.random_iterations), desc="Kickstarting Dreamer Agent.", leave=True):
             self.rollout_policy(env, random_policy=True)
             WM_loss = self.train_world_model()
-            actor_loss, critic_loss = self.train_Agent()
             WM_loss_list.append([x.detach().cpu().item() for x in WM_loss]) 
-            actor_loss_list.append(actor_loss.detach().cpu().item())
-            critic_loss_list.append(critic_loss.detach().cpu().item())
         print("Starting Training Loop...")
         eval_reward = self.evaluate_agent(eval_env, eval_episodes=3)
         evaluation_list.append(eval_reward.detach().cpu().item())
