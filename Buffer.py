@@ -24,7 +24,7 @@ class Buffer:
         reward = np.array(reward, dtype=np.float32)
         reward_symlog = symlog_np(reward)
         self.reward_buffer[self.next_idx] = reward_symlog
-
+        
         self.next_idx = (self.next_idx + 1) % self.capacity
         if self.size < self.capacity:
             self.size = self.size + 1

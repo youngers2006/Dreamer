@@ -1,5 +1,25 @@
 import numpy as np
 import gymnasium as gym
+import cv2
+import PyFlyt.gym_envs
+
+class DroneAdaptor(gym.ActionWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float32)
+
+    def action(self, action):
+        forward = action[0]  # Forward/Back
+        right = action[1]  # Strafe Right/Left (New!)
+        lift = action[2]  # Up/Down
+        turn = action[3]  # Yaw Rotation
+        
+        vel_x = forward
+        vel_y = right 
+        vel_z = lift
+        yaw_rate = turn
+
+        return np.array([vel_x, vel_y, vel_z, yaw_rate], dtype=np.float32)
 
 class CarRacerAdaptor(gym.ActionWrapper):
     def __init__(self, env):
