@@ -124,8 +124,9 @@ class WorldModel(nn.Module):
 
         reward_th = to_twohot(rew_targets, self.reward_predictor.buckets_rew)
 
-        dist = torch.distributions.Normal(loc=dec_mu.float(), scale=1.0)
-        obs_log_lh = dist.log_prob(obs_targets.float()).sum(dim=[-3,-2,-1])
+        # dist = torch.distributions.Normal(loc=dec_mu.float(), scale=1.0)
+        # obs_log_lh = dist.log_prob(obs_targets.float()).sum(dim=[-3,-2,-1])
+        obs_log_lh = - (dec_mu.float() - obs_targets.float()).pow(2).sum(dim=[-3,-2,-1])
         
         cont_log_lh = torch.nn.functional.binary_cross_entropy_with_logits(
             cont_logits,
@@ -194,7 +195,7 @@ class WorldModel(nn.Module):
         self.optimiser.zero_grad()
         self.scalar.scale(total_loss).backward()
         self.scalar.unscale_(self.optimiser)
-        nn.utils.clip_grad_norm_(self.parameters(), 10.0)
+        nn.utils.clip_grad_norm_(self.parameters(), 100.0)
         self.scalar.step(self.optimiser)
         self.scalar.update()
 

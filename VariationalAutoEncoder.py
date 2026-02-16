@@ -77,6 +77,7 @@ class Decoder(nn.Module):
 
         self.upscaler = nn.Sequential(
             nn.Linear(in_features=latent_num_rows * latent_num_columns + hidden_state_dim, out_features=hidden_layer_nodes, device=device),
+            nn.LayerNorm(hidden_layer_nodes, device=device),
             nn.SiLU(),
             nn.Linear(in_features=hidden_layer_nodes, out_features=self.num_filters_start * self.start_height * self.start_width, device=device),
             nn.SiLU()
