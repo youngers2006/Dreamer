@@ -363,7 +363,7 @@ class Dreamer(nn.Module):
                     rewards=_sanitize_for_save(evaluation_list)
                 )
 
-            if iter % 500 == 0:
+            if iter % 1000 == 0:
                 eval_reward = self.evaluate_agent(eval_env, eval_episodes=3)
                 evaluation_list.append(eval_reward.detach().cpu().item())
         print("Training Complete.")
