@@ -1,9 +1,8 @@
-from . import DynamicsPredictors
-from . import SequenceModel
-from . import VariationalAutoEncoder
+from .DynamicsPredictors import DynamicsPredictor, RewardPredictor, ContinuePredictor
+from .SequenceModel import SequenceModel
+from .VariationalAutoEncoder import Encoder, Decoder
 
 __all__ = [
-    "DynamicsPredictors",
-    "SequenceModel",
-    "VariationalAutoEncoder"
+    "DynamicsPredictor", "RewardPredictor", "ContinuePredictor",
+    "SequenceModel", "Encoder", "Decoder"
 ]
