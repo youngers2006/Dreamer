@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from DreamerUtils import symlog_np
+from .DreamerUtils import symlog_np
 
 class Buffer:
     def __init__(self, buffer_size, sequence_length, action_size, observation_dims, device='cpu'):

@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Normal, TanhTransform, TransformedDistribution
-from DreamerUtils import symexp, to_twohot, symlog
 import copy
+
+# file module imports
+from Utils import symexp, to_twohot, symlog
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(

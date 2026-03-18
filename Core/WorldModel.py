@@ -1,41 +1,41 @@
 import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler
-from VariationalAutoEncoder import Decoder, Encoder
-from DynamicsPredictors import DynamicsPredictor, RewardPredictor, ContinuePredictor
-from SequenceModel import SequenceModel
 import torch.distributions as distributions
 from torch.distributions import Normal, Bernoulli
 import torch.optim as optim
-from DreamerUtils import gaussian_log_probability, to_twohot, symlog
+
+# file module imports
+from Utils import gaussian_log_probability, to_twohot, symlog
+from Networks import DynamicsPredictor, RewardPredictor, ContinuePredictor, SequenceModel, Decoder, Encoder
 
 class WorldModel(nn.Module):
     def __init__(
-            self, 
-            hidden_dims, 
-            latent_dims, 
-            observation_dims, 
-            action_dims, 
-            training_horizon, 
-            batch_size, 
+            self,
+            hidden_dims,
+            latent_dims,
+            observation_dims,
+            action_dims,
+            training_horizon,
+            batch_size,
             WM_lr,
             WM_betas,
             WM_eps,
-            beta_pred, 
-            beta_dyn, 
-            beta_rep, 
-            num_encoder_filters_1, 
+            beta_pred,
+            beta_dyn,
+            beta_rep,
+            num_encoder_filters_1,
             num_encoder_filters_2,
             encoder_hidden_layer_nodes,
-            num_decoder_filters_1, 
-            num_decoder_filters_2, 
+            num_decoder_filters_1,
+            num_decoder_filters_2,
             decoder_hidden_layer_nodes,
-            dyn_pred_hidden_num_nodes_1, 
+            dyn_pred_hidden_num_nodes_1,
             dyn_pred_hidden_num_nodes_2,
-            rew_pred_hidden_num_nodes_1, 
-            rew_pred_hidden_num_nodes_2, 
+            rew_pred_hidden_num_nodes_1,
+            rew_pred_hidden_num_nodes_2,
             reward_buckets,
-            cont_pred_hidden_num_nodes_1, 
+            cont_pred_hidden_num_nodes_1,
             cont_pred_hidden_num_nodes_2,
             device='cpu'
         ):
@@ -52,12 +52,34 @@ class WorldModel(nn.Module):
         self.beta_rep = beta_rep
         self.batch_size = batch_size
 
-        self.encoder = Encoder(observation_dims, hidden_dims, latent_dims[0], latent_dims[1], num_encoder_filters_1, num_encoder_filters_2, encoder_hidden_layer_nodes, device=device)
-        self.sequence_model = SequenceModel(latent_dims[0], latent_dims[1], hidden_dims, action_dims, num_layers=1, device=device)
-        self.dynamics_predictor = DynamicsPredictor(latent_dims[0], latent_dims[1], hidden_dims, dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, device)
-        self.reward_predictor = RewardPredictor(latent_dims[0], latent_dims[1], hidden_dims, rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2, reward_buckets, device=device)
-        self.continue_predictor = ContinuePredictor(latent_dims[0], latent_dims[1], hidden_dims, cont_pred_hidden_num_nodes_1, cont_pred_hidden_num_nodes_2, device=device)
-        self.decoder = Decoder(latent_dims[0], latent_dims[1], observation_dims, hidden_dims, num_decoder_filters_1, num_decoder_filters_2, decoder_hidden_layer_nodes, device=device)
+        self.encoder = Encoder(
+            observation_dims, hidden_dims, latent_dims[0], 
+            latent_dims[1], num_encoder_filters_1, num_encoder_filters_2, 
+            encoder_hidden_layer_nodes, device=device
+        )
+        self.sequence_model = SequenceModel(
+            latent_dims[0], latent_dims[1], hidden_dims, 
+            action_dims, num_layers=1, device=device
+        )
+        self.dynamics_predictor = DynamicsPredictor(
+            latent_dims[0], latent_dims[1], hidden_dims, 
+            dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, device
+        )
+        self.reward_predictor = RewardPredictor(
+            latent_dims[0], latent_dims[1], hidden_dims, 
+            rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2, 
+            reward_buckets, device=device
+        )
+        self.continue_predictor = ContinuePredictor(
+            latent_dims[0], latent_dims[1], hidden_dims, 
+            cont_pred_hidden_num_nodes_1, cont_pred_hidden_num_nodes_2, 
+            device=device
+        )
+        self.decoder = Decoder(
+            latent_dims[0], latent_dims[1], observation_dims, 
+            hidden_dims, num_decoder_filters_1, num_decoder_filters_2, 
+            decoder_hidden_layer_nodes, device=device
+        )
         self.device = device
  
         self.optimiser = torch.optim.AdamW(
