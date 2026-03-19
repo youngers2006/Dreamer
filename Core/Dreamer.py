@@ -16,7 +16,7 @@ class Dreamer(nn.Module):
     Main Dreamer class
     """
     def __init__(
-            self, 
+            self,
             config,
             device
         ):

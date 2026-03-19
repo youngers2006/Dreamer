@@ -8,25 +8,25 @@ from Utils import symexp, to_twohot, symlog
 
 class Agent(nn.Module): # batched sequence (batch_size, sequence_length, features*)
     def __init__(
-            self, 
+            self,
             action_dim,
             latent_dims,
             hidden_state_dim,
             HL_A1,
             HL_A2,
             HL_C1,
-            HL_C2, 
+            HL_C2,
             critic_buckets,
-            A_lr, 
-            A_betas, 
+            A_lr,
+            A_betas,
             A_eps,
-            C_lr, 
-            C_betas, 
+            C_lr,
+            C_betas,
             C_eps,
             nu,
             lambda_,
             gamma,
-            *, 
+            *,
             device='cpu'
         ):
         super().__init__()
@@ -41,12 +41,12 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
             device=device
         )
         self.critic = Critic(
-            latent_dims[0], 
-            latent_dims[1], 
-            hidden_state_dim, 
-            HL_C1, 
-            HL_C2, 
-            critic_buckets, 
+            latent_dims[0],
+            latent_dims[1],
+            hidden_state_dim,
+            HL_C1,
+            HL_C2,
+            critic_buckets,
             device=device
         )
         self.target_critic = copy.deepcopy(self.critic)
