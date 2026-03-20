@@ -62,22 +62,23 @@ class WorldModel(nn.Module):
             action_dims, num_layers=1, device=device
         )
         self.dynamics_predictor = DynamicsPredictor(
-            latent_dims[0], latent_dims[1], hidden_dims, 
-            dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, device
+            latent_dims[0], latent_dims[1], hidden_dims,
+            dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, 
+            device=device
         )
         self.reward_predictor = RewardPredictor(
-            latent_dims[0], latent_dims[1], hidden_dims, 
-            rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2, 
+            latent_dims[0], latent_dims[1], hidden_dims,
+            rew_pred_hidden_num_nodes_1, rew_pred_hidden_num_nodes_2,
             reward_buckets, device=device
         )
         self.continue_predictor = ContinuePredictor(
-            latent_dims[0], latent_dims[1], hidden_dims, 
-            cont_pred_hidden_num_nodes_1, cont_pred_hidden_num_nodes_2, 
+            latent_dims[0], latent_dims[1], hidden_dims,
+            cont_pred_hidden_num_nodes_1, cont_pred_hidden_num_nodes_2,
             device=device
         )
         self.decoder = Decoder(
-            latent_dims[0], latent_dims[1], observation_dims, 
-            hidden_dims, num_decoder_filters_1, num_decoder_filters_2, 
+            latent_dims[0], latent_dims[1], observation_dims,
+            hidden_dims, num_decoder_filters_1, num_decoder_filters_2,
             decoder_hidden_layer_nodes, device=device
         )
         self.device = device

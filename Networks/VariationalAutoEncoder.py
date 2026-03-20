@@ -2,23 +2,36 @@ import torch
 import torch.nn as nn
 
 class Encoder(nn.Module):
-    """
-    Encoder segment of VAE, maps observations to latent state representation.
+    """Encoder segment of VAE, maps observations to latent state representation.
+
+    This class is a convolutional NN that outputs the latent state for the current timestep
+    given the current hidden state and current observation.
+
+    Args:
+        observation_dims (tuple[int, int]): dimensions of the observation. 
+        hidden_state_dim (int): Size of hidden state vector.
+        latent_num_rows (int): Number of rows in the discrete latent state matrix.
+        latent_num_columns (int): Number of columns in the discrete latent state matrix.
+        num_filters_1 (int): Number of filters in the first layer of the CNN.
+        num_filters_2 (int): Number of filters in the second layer of the CNN.
+        hidden_layer_nodes (int): Number of neurons in hidden layer. 
+        device (str, optional): Storage location of the network ('cpu' or 'cuda'). 
+            Defaults to 'cpu'.
+
+    Attributes:
+        latent_size (int): Size of flattened latent state matrix.
+        latent_num_rows (int): Number of rows in the latent state matrix.
+        latent_num_columns (int): Number of columns in the latent state matrix.
+        final_height (int): Height of compressed observation image.
+        final_width (int): Width of compressed observation image.
+        device (str): Storage location of the network ('cpu' or 'cuda').
     """
     def __init__(
-            self,
-            observation_dims,
-            hidden_state_dim,
-            latent_num_rows,
-            latent_num_columns,
-            num_filters_1,
-            num_filters_2,
-            hidden_layer_nodes,
-            device='cpu'
+            self, observation_dims, hidden_state_dim,
+            latent_num_rows, latent_num_columns, num_filters_1,
+            num_filters_2, hidden_layer_nodes, device='cpu'
         ):
         super().__init__()
-
-        # Initialise dimensions
         self.latent_size = latent_num_rows * latent_num_columns
         self.latent_num_rows = latent_num_rows
         self.latent_num_columns = latent_num_columns
@@ -29,7 +42,6 @@ class Encoder(nn.Module):
         if self.final_height < 1 or self.final_width < 1:
             raise ValueError(f"Input image {observation_dims} is too small for 4 layers of downsampling.")
 
-        # create convolutional net to analyse images
         self.feature_extractor = nn.Sequential(
             nn.Conv2d(3, num_filters_1, kernel_size=4, stride=2, padding=1, device=device),
             nn.SiLU(),
@@ -45,7 +57,6 @@ class Encoder(nn.Module):
         flattened_feature_size = (num_filters_2 * 4) * self.final_height * self.final_width
         total_in_features = flattened_feature_size + hidden_state_dim
 
-        # create network to map analysed images to latent states
         self.flatten = nn.Flatten(start_dim=2)
         self.latent_mapper = nn.Sequential(
             nn.Linear(in_features=total_in_features, out_features=hidden_layer_nodes, device=device),
@@ -94,7 +105,9 @@ class Encoder(nn.Module):
         # sample from distribution to obtain a latent state, using sampling trick to allow gradient flow (STE)
         dist = torch.distributions.Categorical(probs=probs)
         sampled_idx = dist.sample()
-        latent_state_OH = torch.nn.functional.one_hot(sampled_idx, num_classes=self.latent_num_columns).float()
+        latent_state_OH = torch.nn.functional.one_hot(
+            sampled_idx, num_classes=self.latent_num_columns
+        ).float()
         latent_state = latent_state_OH + probs - probs.detach()
         return latent_state, logits
 
