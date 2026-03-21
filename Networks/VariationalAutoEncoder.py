@@ -25,6 +25,9 @@ class Encoder(nn.Module):
         final_height (int): Height of compressed observation image.
         final_width (int): Width of compressed observation image.
         device (str): Storage location of the network ('cpu' or 'cuda').
+
+    Raises:
+        ValueError: Raised if observation is too small for 4 layers of down sampling.
     """
     def __init__(
             self, observation_dims, hidden_state_dim,
@@ -112,20 +115,46 @@ class Encoder(nn.Module):
         return latent_state, logits
 
 class Decoder(nn.Module):
+    """Decoder segment of VAE, reconstructs observation from hidden and latent states.
+
+    This class is a transposed convolutional NN that reconstructs the observation for the current 
+    timestep given the current hidden and latent states.
+
+    Args:
+        latent_num_rows (int): Number of rows in the discrete latent state matrix.
+        latent_num_columns (int): Number of columns in the discrete latent state matrix.
+        observation_dim (tuple[int, int]): dimensions of the observation. 
+        hidden_state_dim (int): Size of hidden state vector.
+        num_filters_1 (int): Number of filters in the first layer of the T-CNN.
+        num_filters_2 (int): Number of filters in the second layer of the T-CNN.
+        hidden_layer_nodes (int): Number of neurons in hidden layer. 
+        device (str, optional): Storage location of the network ('cpu' or 'cuda'). 
+            Defaults to 'cpu'.
+
+    Attributes:
+        start_height (int): Height of compressed reconstructed observation.
+        start_width (int): Width of compressed reconstructed observation.
+        num_filters_start (int): Number of filters in first layer of T-CNN.
+        hidden_dim (int): Size of hidden state vector.
+        latent_row_dim (int): Number of rows in the latent state matrix.
+        latent_col_dim (int): Number of columns in the latent state matrix.
+        device (str): Storage location of the network ('cpu' or 'cuda').
     """
-    Decoder section of the VAE, maps latent states back to observations.
-    """
-    def __init__(self, latent_num_rows, latent_num_columns, observation_dim, hidden_state_dim, num_filters_1, num_filters_2, hidden_layer_nodes, device='cpu'):
+    def __init__(
+            self, latent_num_rows, latent_num_columns, observation_dim,
+            hidden_state_dim, num_filters_1, num_filters_2,
+            hidden_layer_nodes, device='cpu'
+        ):
         super().__init__()
 
         # initialise dimensions
         self.start_height = observation_dim[0] // 16
         self.start_width = observation_dim[1] // 16
         self.num_filters_start = num_filters_2 * 4
-
         self.hidden_dim = hidden_state_dim
         self.latent_row_dim = latent_num_rows
         self.latent_col_dim = latent_num_columns
+
         self.flatten = nn.Flatten(start_dim=1)
 
         # create network to map latent state back to observation features
