@@ -1,12 +1,10 @@
-import torch as nn
-import torch.nn
+import os
+import argparse
+import torch
 import gymnasium as gym
 from gymnasium.wrappers import ResizeObservation
-import matplotlib.pyplot as plt
 import numpy as np
-import os
 import yaml
-import argparse
 
 # Import Modules
 from Utils import _sanitize_for_save
@@ -40,7 +38,7 @@ def main(config):
     env = CropObservation(env)
     evaluation_env = CropObservation(evaluation_env)
 
-    # resize observation to improve training speed 
+    # resize observation to improve training speed
     env = ResizeObservation(env, tuple(config['observation_dims']))
     evaluation_env = ResizeObservation(evaluation_env, tuple(config['observation_dims']))
 
@@ -49,7 +47,8 @@ def main(config):
     evaluation_env = ActionRepeat(CarRacerAdaptor(evaluation_env), repeat=4)
 
     # train dreamer model on environment
-    WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list = dreamer_agent.train_dreamer(env, evaluation_env)
+    (WM_loss_list, actor_loss_list,
+     critic_loss_list, evaluation_list) = dreamer_agent.train_dreamer(env, evaluation_env)
 
     # save final model weights
     model_dir = os.environ.get('SM_MODEL_DIR', './models')

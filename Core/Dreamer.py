@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from tqdm import tqdm
-import yaml
 
 # file module imports
 from Utils import _sanitize_for_save, Buffer
@@ -182,7 +181,8 @@ class Dreamer(nn.Module):
             )
 
             # Take action in imagination
-            hidden_state__batch, latent_state__batch, reward_batch, continue_batch = self.world_model.imagine_step(
+            (hidden_state__batch, latent_state__batch, reward_batch,
+             continue_batch) = self.world_model.imagine_step(
                 hidden_state_batch, latent_state_batch, action_batch
             )
 
