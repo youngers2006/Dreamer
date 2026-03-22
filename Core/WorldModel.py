@@ -6,37 +6,66 @@ from torch.distributions import Normal, Bernoulli
 import torch.optim as optim
 
 # file module imports
-from Utils import gaussian_log_probability, to_twohot, symlog
+from Utils import to_twohot
 from Networks import DynamicsPredictor, RewardPredictor, ContinuePredictor, SequenceModel, Decoder, Encoder
 
 class WorldModel(nn.Module):
+    """World Model class.
+
+    This class is the World Model class, it consists of a Recurrant State Space Model (RSSM)
+    and a Variational Auto Encoder (VAE). Training logic is self contained. This class
+    allows the agent to imagine trajectories for training by learning the dynamics of the environment.
+
+    Args:
+        hidden_dims (int): Size of the hidden state vector.
+        latent_dims (tuple(int, int)): Dimensions of the latent state matrix.
+        observation_dims (tuple(int, int)): Dimensions of the observation.
+        action_dims (int): Size of the action vector.
+        training_horizon (int): Length of imagined trajectories.
+        batch_size (int): Size of training batches.
+        WM_lr (float): World model learn rate.
+        WM_betas (tuple(float, float)): World Model adam optimiser hyperparams.
+        WM_eps (float): World Model adam optimiser hyperparams.
+        beta_pred (float): Relative loss scaling for prediction.
+        beta_dyn (float): Relative loss sclaing for dynamics.
+        beta_rep (float): Relative loss scaling for representation.
+        num_encoder_filters_1 (int): Number of filters in the encoder layer 1.
+        num_encoder_filters_2 (int): Number of filters in the encoder layer 2.
+        encoder_hidden_layer_nodes (int): Number of neurons in the encoder HL.
+        num_decoder_filters_1 (int): Number of filters in the decoder layer 1.
+        num_decoder_filters_2 (int): Number of filters in the decoder layer 2.
+        decoder_hidden_layer_nodes (int): Number of neurons in the decoder HL.
+        dyn_pred_hidden_num_nodes_1 (int): Number of neurons in the dyn predictor network HL1.
+        dyn_pred_hidden_num_nodes_2 (int): Number of neurons in the dyn predictor network HL2.
+        rew_pred_hidden_num_nodes_1 (int): Number of neurons in the rew predictor network HL1.
+        rew_pred_hidden_num_nodes_2 (int): Number of neurons in the rew predictor network HL2.
+        reward_buckets (int): Number of reward buckets in twohot encoding.
+        cont_pred_hidden_num_nodes_1 (int): Number of neurons in the cont predictor network HL1.
+        cont_pred_hidden_num_nodes_2 (int): Number of neurons in the cont predictor network HL2.
+        device (str, optional): Storage location of the network ('cpu' or 'cuda'). 
+            Defaults to 'cpu'.
+
+    Attributes:
+        latent_num_rows (int): Number of rows in latent state matrix.
+        latent_num_columns (int): Number of columns in latent state matrix.
+        hidden_dims (int): Size of hidden state vector.
+        action_dims (int): Size of action vector.
+        observation_dim_x (int): Number of columns in observation.
+        observation_dim_y (int): Number of rows in observation.
+        horizon (int): Length of imagination horizon.
+        buckets (int): Number of buckets in twohot encoding.
+        device (str): Storage location of the network ('cpu' or 'cuda').
+    """
     def __init__(
-            self,
-            hidden_dims,
-            latent_dims,
-            observation_dims,
-            action_dims,
-            training_horizon,
-            batch_size,
-            WM_lr,
-            WM_betas,
-            WM_eps,
-            beta_pred,
-            beta_dyn,
-            beta_rep,
-            num_encoder_filters_1,
-            num_encoder_filters_2,
-            encoder_hidden_layer_nodes,
-            num_decoder_filters_1,
-            num_decoder_filters_2,
-            decoder_hidden_layer_nodes,
-            dyn_pred_hidden_num_nodes_1,
-            dyn_pred_hidden_num_nodes_2,
-            rew_pred_hidden_num_nodes_1,
-            rew_pred_hidden_num_nodes_2,
-            reward_buckets,
-            cont_pred_hidden_num_nodes_1,
-            cont_pred_hidden_num_nodes_2,
+            self, hidden_dims: int, latent_dims: int,
+            observation_dims: int, action_dims: int, training_horizon: int,
+            batch_size: int, WM_lr: float, WM_betas: tuple[float, float],
+            WM_eps: float, beta_pred: float, beta_dyn: float,
+            beta_rep, num_encoder_filters_1: int, num_encoder_filters_2: int,
+            encoder_hidden_layer_nodes: int, num_decoder_filters_1: int, num_decoder_filters_2: int,
+            decoder_hidden_layer_nodes: int, dyn_pred_hidden_num_nodes_1: int, dyn_pred_hidden_num_nodes_2: int,
+            rew_pred_hidden_num_nodes_1: int, rew_pred_hidden_num_nodes_2: int, reward_buckets: int,
+            cont_pred_hidden_num_nodes_1: int, cont_pred_hidden_num_nodes_2: int,
             device='cpu'
         ):
         super().__init__()
@@ -84,12 +113,14 @@ class WorldModel(nn.Module):
         self.device = device
  
         self.optimiser = torch.optim.AdamW(
-            self.parameters(), 
-            lr=WM_lr, 
+            self.parameters(),
+            lr=WM_lr,
             betas=(WM_betas[0], WM_betas[1]),  
             eps=WM_eps,
             weight_decay=1e-6
         )
+
+        # Gradscalar to accelarate training
         self.scalar = torch.amp.GradScaler()
 
     def imagine_step(self, hidden_state, latent_state, action):
@@ -106,9 +137,9 @@ class WorldModel(nn.Module):
     
     def unroll_model(
             self,
-            observation_sequence_batch: torch.tensor, 
-            action_sequence_batch: torch.tensor, 
-            reward_sequence_batch: torch.tensor, 
+            observation_sequence_batch: torch.tensor,
+            action_sequence_batch: torch.tensor,
+            reward_sequence_batch: torch.tensor,
             continue_sequence_batch: torch.tensor
         ):
         B = continue_sequence_batch.shape[0]

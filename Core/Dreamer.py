@@ -12,8 +12,25 @@ from .WorldModel import WorldModel
 from .Agent import Agent
 
 class Dreamer(nn.Module):
-    """
-    Main Dreamer class
+    """Dreamer agent class.
+
+    This class is the DreamerV3 agent class, it consists of an Encoder-Decoder pair,
+    an RSSM, an Actor-Critic REINFORCE agent and a Buffer. The training loop and inference
+    functions are all contained in this class.
+
+    Args:
+        config (dict): Dictionary storing configurations for the agent.
+        device (str, optional): Storage location of the network ('cpu' or 'cuda'). 
+            Defaults to 'cpu'.
+
+    Attributes:
+        hidden_state_dims (int): Hidden state vector size.
+        action_dims (int): Action vector size.
+        observation_dims (tuple(int, int)): Observation size.
+        latent_state_dims (tuple(int, int)): Latent state matrix size.
+        agent_obs (None / torch.Tensor): Intermediate observation store for rollout.
+        agent_hidden (None / torch.Tensor): Intermediate hidden state store for rollout.
+        agent_latent (None / torch.Tensor): Intermediate latent state store for rollout.
     """
     def __init__(
             self,
@@ -21,6 +38,8 @@ class Dreamer(nn.Module):
             device
         ):
         super().__init__()
+
+        # Unload config file
         hidden_state_dims=config['hidden_state_dims']
         latent_state_dims=tuple(config['latent_state_dims'])
         observation_dims=tuple(config['observation_dims'])
@@ -81,21 +100,20 @@ class Dreamer(nn.Module):
             decoder_filter_num_1, decoder_filter_num_2, decoder_hidden_layer_nodes,
             dyn_pred_hidden_num_nodes_1, dyn_pred_hidden_num_nodes_2, rew_pred_hidden_num_nodes_1,
             rew_pred_hidden_num_nodes_2, critic_reward_buckets, cont_pred_hidden_num_nodes_1,
-            cont_pred_hidden_num_nodes_2, device=device
+            cont_pred_hidden_num_nodes_2,
+            device=device
         )
         self.agent = Agent(
             action_dims, latent_state_dims, hidden_state_dims,
             hidden_layer_actor_1_size, hidden_layer_actor_2_size, hidden_layer_critic_1_size,
             hidden_layer_critic_2_size, critic_reward_buckets, actor_lr,
-            actor_betas, actor_eps, critic_lr,
-            critic_betas, critic_eps, nu,
-            lambda_, gamma, device=device
+            actor_betas, actor_eps, critic_lr, critic_betas,
+            critic_eps, nu, lambda_, gamma,
+            device=device
         )
         self.buffer = Buffer(
-            buffer_size,
-            sequence_length,
-            action_dims,
-            observation_dims,
+            buffer_size, sequence_length,
+            action_dims, observation_dims,
             device=device
         )
         self.horizon = horizon
@@ -115,11 +133,29 @@ class Dreamer(nn.Module):
         self.agent_hidden = None
         self.agent_latent = None
 
-    def dream_episodes(self, starting_latent_state_batch, starting_hidden_state_batch):
-        """
-        Purpose: given a starting state use the world model to imagine future trajectories within the horizon.
-        Args: latent state representation of the starting state, hidden state of the sequence model at the starting state.
-        Returns: latent states, hidden states, actions, rewards, continue flags, action distribution params. All from the imagined trajectory.
+    def dream_episodes(
+            self, starting_latent_state_batch: torch.Tensor,
+            starting_hidden_state_batch: torch.Tensor
+        ):
+        """Imagines a sequence anchors at a buffer sample.
+        
+        Given a starting state use the world model to imagine future 
+        trajectories within the horizon.
+
+        Args:
+            starting_latent_state_batch (torch.Tensor): Sampled initial 
+            batch of latent states to anchor dreamed episodes.
+            starting_hidden_state_batch (torch.Tensor): Initial batch of 
+            hidden states to anchor dreamed episodes. 
+        
+        Returns:
+            latent_states (torch.Tensor): Batch of imagined latent state sequences.
+            hidden_states (torch.Tensor): Batch of imagined hidden state sequences.
+            actions (torch.Tensor): Batch of imagined imagined sequences.
+            rewards (torch.Tensor): Batch of imagined reward sequences.
+            continues_ (torch.Tensor): Batch of imagined continue sequences.
+            a_mus (torch.Tensor): Batch of imagined action prediction mean sequences.
+            a_sigmas (torch.Tensor): Batch of imagined action prediction std.dev sequences.
         """
         hidden_state_batch = starting_hidden_state_batch
         latent_state_batch = starting_latent_state_batch
@@ -146,10 +182,10 @@ class Dreamer(nn.Module):
             a_sigmas.append(a_sigma_batch)
             hidden_state_batch = hidden_state__batch
             latent_state_batch = latent_state__batch
-        
-        hidden_states.append(hidden_state_batch) 
+
+        hidden_states.append(hidden_state_batch)
         latent_states.append(latent_state_batch)
-        
+
         latent_states = torch.cat(
             latent_states, dim=1
         )
@@ -172,19 +208,27 @@ class Dreamer(nn.Module):
             a_sigmas, dim=1
         )
         return latent_states, hidden_states, actions, rewards, continues_, a_mus, a_sigmas
-    
+
     def rollout_policy(self, env, random_policy=False):
+        """Rolls out policy in environment to collect trajectories for the buffer.
+        
+        Rolls out either the current policy or a random policy on the environment
+        to collect data to store in the buffer.
+
+        Args:
+            env: Environment to roll out policy on, must respond to gymnasium commands.
+            random_policy (bool): Use current policy or random policy.
         """
-        Purpose: rolls out either the current trained policy or a random policy to collect trajectories for training.
-        Args: environments to roll out on, flag to either use random or trained policy.
-        Returns: No explicit returns, all collected data is added to the buffer.
-        """
+
+        # Stop gradient tracking
         with torch.no_grad():
+
+            # If no observation stored then get one by resetting the environment
             if self.agent_obs is None:
                 observation, _ = env.reset(seed=self.seed)
                 observation = observation.transpose(2,0,1).astype(np.uint8)
                 self.agent_obs = (observation.astype(np.float32) / 255.0) - 0.5
-                
+     
                 self.agent_hidden = torch.zeros(
                     1, 1, self.hidden_state_dims, dtype=torch.float32, device=self.device
                 )
@@ -247,29 +291,43 @@ class Dreamer(nn.Module):
                     )
 
     def train_world_model(self):
-        """
-        Purpose: Samples a batch of trajectories from the buffer and uses these to train the world model.
-        Args: None.
-        Returns: Training losses log.
+        """Trains the world model on sampled data.
+        
+        Samples a batch of trajectories from the buffer and 
+        uses these to train the world model.
+
+        Returns:
+            loss_list (list): Training losses for training log.
         """
         loss_list = []
         for _ in tqdm(range(self.WM_epochs), desc="Training World Model On Buffer Data", leave=False):
-            observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch, _ = self.buffer.sample_sequences(
-                batch_size=self.batch_size
-            )
-            
+            (observation_seq_batch, action_seq_batch, reward_seq_batch, 
+             continue_seq_batch, _) = self.buffer.sample_sequences(batch_size=self.batch_size)
+
             loss_world_model = self.world_model.training_step(
                 observation_seq_batch, action_seq_batch, reward_seq_batch, continue_seq_batch
             )
             loss_list.append(loss_world_model)
         return loss_list
 
-    def warm_start_generator(self, observation_seq_batch, action_seq_batch, sequence_length):
-        """
-        Purpose: Since the sampled sequence length is longer than the horizon this function takes the tajectories and 
-                calculates the hidden and latent states for where in the sequence the agent starts training on.
-        Args: observations, actions, from a batch of imagined trajectories, length of the imagined trajectories.
-        Returns
+    def warm_start_generator(
+            self, observation_seq_batch,
+            action_seq_batch, sequence_length
+        ):
+        """Generates initial hidden state and latent state for agent training process.
+        
+        The training process for the agent requires starting imagined trajectories
+        at sampled states in the buffer, using a warmup length of half
+        the sequence length.
+
+        Args:
+            observation_seq_batch (torch.Tensor): Batch of sampled sequences of observations.
+            action_seq_batch (torch.Tensor): Batch of sampled sequences of actions.
+            sequence_length (int): Length of sampled sequence.
+
+        Returns:
+            latent_batch (torch.Tensor): Latent state to warm start agent training.
+            hidden_batch (torch.Tensor): Hidden state to warm start agent training.
         """
         observation_seq_batch = (observation_seq_batch.float() / 255.0) - 0.5
         hidden_batch = torch.zeros(
@@ -285,8 +343,18 @@ class Dreamer(nn.Module):
                 observation_seq_batch[:, t:t+1, :]
             )
         return latent_batch, hidden_batch
-    
+
     def train_Agent(self):
+        """Generates initial hidden state and latent state for agent training process.
+        
+        The training process for the agent requires starting imagined trajectories
+        at sampled states in the buffer, using a warmup length of half
+        the sequence length.
+
+        Returns:
+            mean_actor_loss (torch.Tensor): Mean loss across batch dimension for the actor.
+            mean_critic_loss (torch.Tensor): Mean loss across batch dimension for the critic.
+        """
         loss_actor_list = []
         loss_critic_list = []
         for _ in tqdm(range(self.AC_epochs), desc="Training Agent in Dreams", leave=False):
@@ -296,9 +364,10 @@ class Dreamer(nn.Module):
             initial_latent_batch, initial_hidden_batch = self.warm_start_generator(
                 observation_seq_batch, action_seq_batch, sequence_length
             )
-            latent_seq_batch_dream, hidden_seq_batch_dream, action_seq_batch_dream, reward_seq_batch_dream, continue_seq_batch_dream, a_mu_batch_seq, a_sigma_batch_seq = self.dream_episodes(
-                initial_latent_batch,
-                initial_hidden_batch
+            (latent_seq_batch_dream, hidden_seq_batch_dream, action_seq_batch_dream,
+                reward_seq_batch_dream, continue_seq_batch_dream, 
+                a_mu_batch_seq, a_sigma_batch_seq) = self.dream_episodes(
+                initial_latent_batch, initial_hidden_batch
             )
             loss_actor, loss_critic = self.agent.train_step(
                 latent_seq_batch_dream, hidden_seq_batch_dream,
@@ -311,18 +380,28 @@ class Dreamer(nn.Module):
         loss_actor_list = torch.stack(loss_actor_list, dim=0)
         loss_critic_list = torch.stack(loss_critic_list, dim=0)
         return loss_actor_list.mean(dim=0), loss_critic_list.mean(dim=0)
-    
-    def load_pretrained_dreamer(self, path):
+
+    def load_pretrained_dreamer(self, path: str):
+        """Loads agent from given path.
+
+        Args:
+            path (str): Path to load trained agent from.
+        """
         self.load_state_dict(
             torch.load(path, weights_only=True)
         )
-    
+
     def save_trained_Dreamer(self, save_path):
+        """Saves agent to given path.
+
+        Args:
+            path (str): Path to save trained agent to.
+        """
         torch.save(
             self.state_dict(), save_path
         )
 
-    def evaluate_agent(self, env, eval_episodes):
+    def evaluate_agent(self, env, eval_episodes: int):
         reward_list = []
         for _ in tqdm(range(eval_episodes), desc="Evaluating Agent", leave=False):
             self.seed += 1
@@ -404,7 +483,7 @@ class Dreamer(nn.Module):
                 # Save Model
                 save_path = os.path.join('./models', f'agent_checkpoint_{iter}.pth')
                 self.save_trained_Dreamer(save_path)
-                
+            
                 # Save Latest Model (overwrite)
                 latest_path = os.path.join('./models', 'agent_latest.pth')
                 self.save_trained_Dreamer(latest_path)
@@ -434,7 +513,7 @@ class Dreamer(nn.Module):
             eval_reward.detach().cpu().item()
         )
         return WM_loss_list, actor_loss_list, critic_loss_list, evaluation_list
-    
+
     def Run(self, env, env_seed, render=True):
         total_reward = 0
         observation, _ = env.reset(seed=env_seed)

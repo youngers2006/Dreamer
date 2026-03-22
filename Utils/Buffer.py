@@ -29,7 +29,7 @@ class Buffer:
         device (str): Storage location of the network ('cpu' or 'cuda').
     """
     def __init__(
-            self, buffer_size, sequence_length, action_size, 
+            self, buffer_size, sequence_length, action_size,
             observation_dims, device='cpu'
         ):
         self.observation_buffer = np.zeros(
@@ -53,7 +53,7 @@ class Buffer:
         self.size = 0
 
     def add_to_buffer(
-            self, observation: np.NDArray, action: np.NDArray, 
+            self, observation: np.NDArray, action: np.NDArray,
             reward: np.NDArray, continue_: np.NDArray
         ):
         """Takes inputs and adds them to the replay buffer.
@@ -61,7 +61,8 @@ class Buffer:
         This function runs a takes inputs, o_t, a_t, r_t, c_t, and adds them to the buffer.
 
         Args:
-            observation (np.NDArray): Observation from environment interaction, uint8 to save memory.
+            observation (np.NDArray): Observation from environment interaction, 
+            uint8 to save memory.
             action (np.NDArray): Action taken in environment.
             reward (np.NDArray): Reward obtained in the environment from taking a_t.
             continue_ (np.NDArray): Flag to signify if the episode has ended.

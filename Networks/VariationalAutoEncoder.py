@@ -128,7 +128,7 @@ class Decoder(nn.Module):
         num_filters_1 (int): Number of filters in the first layer of the T-CNN.
         num_filters_2 (int): Number of filters in the second layer of the T-CNN.
         hidden_layer_nodes (int): Number of neurons in hidden layer. 
-        device (str, optional): Storage location of the network ('cpu' or 'cuda'). 
+        device (str, optional): Storage location of the network ('cpu' or 'cuda').
             Defaults to 'cpu'.
 
     Attributes:
