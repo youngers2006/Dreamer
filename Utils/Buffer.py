@@ -18,10 +18,10 @@ class Buffer:
             Defaults to 'cpu'.
 
     Attributes:
-        observation_buffer (NDArray[np.uint8]): Store of environment observations. 
-        action_buffer (NDArray[np.float32]): Store of environment actions taken. 
-        reward_buffer (NDArray[np.float32]): Store of environment reward returns. 
-        continue_buffer (NDArray[np.float32]): Store of environment continue flag returns.
+        observation_buffer (ndarray[np.uint8]): Store of environment observations. 
+        action_buffer (ndarray[np.float32]): Store of environment actions taken. 
+        reward_buffer (ndarray[np.float32]): Store of environment reward returns. 
+        continue_buffer (ndarray[np.float32]): Store of environment continue flag returns.
         capactity (int): Length of buffer.
         sequence_length (int): Length of sequences sampled from environment.
         next_idx (int): Count of current buffer position.
@@ -29,21 +29,17 @@ class Buffer:
         device (str): Storage location of the network ('cpu' or 'cuda').
     """
     def __init__(
-            self, buffer_size, sequence_length, action_size,
-            observation_dims, device='cpu'
+            self, buffer_size: int, sequence_length: int, action_size: int,
+            observation_dims: tuple[int, int], device='cpu'
         ):
         self.observation_buffer = np.zeros(
-            (buffer_size, 3, *observation_dims), dtype=np.uint8
-        )
+            (buffer_size, 3, *observation_dims), dtype=np.uint8)
         self.action_buffer = np.zeros(
-            (buffer_size, action_size), dtype=np.float32
-        )
+            (buffer_size, action_size), dtype=np.float32)
         self.reward_buffer = np.zeros(
-            (buffer_size, 1), dtype=np.float32
-        )
+            (buffer_size, 1), dtype=np.float32)
         self.continue_buffer = np.zeros(
-            (buffer_size, 1), dtype=np.float32
-        )
+            (buffer_size, 1), dtype=np.float32)
 
         self.capacity = buffer_size
         self.sequence_length = sequence_length
@@ -53,19 +49,19 @@ class Buffer:
         self.size = 0
 
     def add_to_buffer(
-            self, observation: np.NDArray, action: np.NDArray,
-            reward: np.NDArray, continue_: np.NDArray
+            self, observation: np.ndarray, action: np.ndarray,
+            reward: np.ndarray, continue_: np.ndarray
         ):
         """Takes inputs and adds them to the replay buffer.
 
         This function runs a takes inputs, o_t, a_t, r_t, c_t, and adds them to the buffer.
 
         Args:
-            observation (np.NDArray): Observation from environment interaction, 
+            observation (np.ndarray): Observation from environment interaction, 
             uint8 to save memory.
-            action (np.NDArray): Action taken in environment.
-            reward (np.NDArray): Reward obtained in the environment from taking a_t.
-            continue_ (np.NDArray): Flag to signify if the episode has ended.
+            action (np.ndarray): Action taken in environment.
+            reward (np.ndarray): Reward obtained in the environment from taking a_t.
+            continue_ (np.ndarray): Flag to signify if the episode has ended.
         """
 
         # Add recorded data to the buffer in intended format
@@ -117,7 +113,8 @@ class Buffer:
             0, valid_starts_index, size=batch_size
         )
 
-        # Fix sampling jumps in the sequences
+        # Fix sampling jumps in the sequences by checking that the update pointer
+        # isnt in the sample sequence
         if self.size == self.capacity:
             end_indices = start_indices + self.sequence_length
             invalid_mask = (start_indices < self.next_idx) & (self.next_idx < end_indices)
@@ -141,15 +138,11 @@ class Buffer:
 
         # Convert samples to tensors and return them
         observations = torch.tensor(
-            observations, dtype=torch.float32, device=self.device
-        )
+            observations, dtype=torch.float32, device=self.device)
         actions = torch.tensor(
-            actions, dtype=torch.float32, device=self.device
-        )
+            actions, dtype=torch.float32, device=self.device)
         rewards = torch.tensor(
-            rewards, dtype=torch.float32, device=self.device
-        )
+            rewards, dtype=torch.float32, device=self.device)
         continues = torch.tensor(
-            continues, dtype=torch.float32, device=self.device
-        )
+            continues, dtype=torch.float32, device=self.device)
         return observations, actions, rewards, continues, sequence_length

@@ -194,9 +194,9 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
         return R_lambda_seq
 
     def train_step(
-            self, z_batch_seq: torch.Tensor, h_batch_seq: torch.Tensor, 
-            reward_batch_seq: torch.Tensor, continue_batch_seq: torch.Tensor, 
-            action_batch_seq: torch.Tensor, 
+            self, z_batch_seq: torch.Tensor, h_batch_seq: torch.Tensor,
+            reward_batch_seq: torch.Tensor, continue_batch_seq: torch.Tensor,
+            action_batch_seq: torch.Tensor,
             a_mu_batch_seq: torch.Tensor, a_sigma_batch_seq: torch.Tensor
         ):
         """Computes trace returns for all steps in a batch of sequences.

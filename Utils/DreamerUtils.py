@@ -1,30 +1,22 @@
 import torch
 import numpy as np
 
-def gaussian_log_probability(x: torch.tensor, mu: torch.tensor, sigma: torch.tensor) -> torch.tensor:
-    """
-    Calculate the log likelyhood of x apprearing in the gaussian distribution defined by mu and sigma.
+def gaussian_log_probability(
+        x: torch.Tensor, mu: torch.Tensor, sigma: torch.Tensor
+    ):
+    """Computes the log probability of x on a given gaussian distribution.
+
+        Args:
+            x (torch.Tensor): Input to find log prob of.
+            mu (torch.Tensor): Mean of gaussian distribution.
+            sigma (torch.Tensor): std.dev of gaussian distribution.
+
+        Returns:
+            log_prob (torch.Tensor): Log probability of x in gaussian.
     """
     dist = torch.distributions.Normal(loc=mu, scale=sigma)
     log_prob = dist.log_prob(x)
     return log_prob
-
-def bernoulli_log_probability(p, k):
-    epsilon = 1e-8
-    p_clamped = torch.clamp(p, min=epsilon, max=1.0 - epsilon)
-    log_prob = k * torch.log(p_clamped) + (1 - k) * torch.log(1 - p_clamped)
-    return log_prob
-
-def kullback_leibler_divergence_between_gaussians(
-        mu_1: torch.tensor,
-        sigma_1: torch.tensor,
-        mu_2: torch.tensor,
-        sigma_2: torch.tensor
-    ) -> torch.tensor:
-    var_1 = torch.square(sigma_1) ; var_2 = torch.square(sigma_2)
-    mean_diff = torch.square(mu_1 - mu_2)
-    Dkl = torch.log(sigma_2 / sigma_1) + ((var_1 + mean_diff) / (2 * var_2)) - 0.5
-    return Dkl
 
 def symlog(x: torch.Tensor):
     """Symetric log function.

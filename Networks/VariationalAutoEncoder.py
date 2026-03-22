@@ -68,7 +68,21 @@ class Encoder(nn.Module):
             nn.Linear(in_features=hidden_layer_nodes, out_features=self.latent_size, device=device)
         )
 
-    def forward(self, hidden, observation):
+    def forward(
+            self, hidden: torch.Tensor, observation: torch.Tensor
+        ):
+        """Forward method for the encoder.
+        
+        Runs CNN to predict latent state prediction logits from the observation
+        and the hidden state.
+
+        Args:
+            hidden (torch.Tensor): Hidden state of the agent.
+            observation (torch.Tensor): Observation of the agent.
+        
+        Returns:
+            logits (torch.Tensor): Prediction logits for the latent state.
+        """
         # get initial shape
         B, S, C, H, W = observation.shape
 
@@ -84,11 +98,25 @@ class Encoder(nn.Module):
 
         # flatten features and use the FF network to map to latent logits
         features = self.flatten(features)
-        input = torch.cat((features, hidden), dim=-1)
-        logits = self.latent_mapper(input)
+        input_vec = torch.cat((features, hidden), dim=-1)
+        logits = self.latent_mapper(input_vec)
         return logits
-    
+
     def encode(self, hidden_state, observation):
+        """Encode method for the encoder.
+        
+        Runs CNN to predict latent state prediction logits from the observation
+        and the hidden state. Then samples a latent state from the probability distribution
+        produced by the logits.
+
+        Args:
+            hidden_state (torch.Tensor): Hidden state of the agent.
+            observation (torch.Tensor): Observation of the agent.
+        
+        Returns:
+            latent_state (torch.Tensor): Stochastic sampled latent state.
+            logits (torch.Tensor): Prediction logits for the latent state.
+        """
         # get initial hidden state shape
         B, S, _ = hidden_state.shape
 
@@ -101,16 +129,16 @@ class Encoder(nn.Module):
         # convert logits to probability with softmax
         probs = torch.softmax(logits.float(), dim=-1)
 
-        # average probabilities with uniform distribution to prevent the distribution collapsing to deterministic
+        # average probabilities with uniform distribution to prevent the
+        # distribution collapsing to deterministic
         uniform = (1.0 / self.latent_num_columns)
         probs = 0.99 * probs + 0.01 * uniform
 
-        # sample from distribution to obtain a latent state, using sampling trick to allow gradient flow (STE)
+        # sample from distribution to obtain a latent state, using STE to allow gradient flow
         dist = torch.distributions.Categorical(probs=probs)
         sampled_idx = dist.sample()
         latent_state_OH = torch.nn.functional.one_hot(
-            sampled_idx, num_classes=self.latent_num_columns
-        ).float()
+            sampled_idx, num_classes=self.latent_num_columns).float()
         latent_state = latent_state_OH + probs - probs.detach()
         return latent_state, logits
 
@@ -178,7 +206,21 @@ class Decoder(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, hidden: torch.tensor, latent: torch.tensor):
+    def forward(
+            self, hidden: torch.Tensor, latent: torch.Tensor
+        ):
+        """Forward method for the Decoder.
+        
+        Runs CNN to predict latent state prediction logits from the observation
+        and the hidden state.
+
+        Args:
+            hidden (torch.Tensor): Hidden state of the agent.
+            latent (torch.Tensor): Observation of the agent.
+        
+        Returns:
+            mu (torch.Tensor): Mean reconstructed observation.
+        """
         # resize latent and hidden states to combine batch and sequence dims
         B, S, _ = hidden.shape
         hidden = hidden.view(B * S, self.hidden_dim)
@@ -201,8 +243,23 @@ class Decoder(nn.Module):
         _, C, H, W = mu.shape
         mu = mu.view(B, S, C, H, W)
         return mu
-    
-    def decode(self, hidden_state: torch.tensor, latent_state: torch.tensor):
-        # return only the mean observation obtained from forward method to keep decoder deterministic
-        mu = self.forward(hidden_state, latent_state)
-        return mu
+
+    def decode(
+            self, hidden_state: torch.Tensor, latent_state: torch.Tensor
+        ):
+        """Decode method for the Decoder.
+        
+        Runs T-CNN to predict the observation from the hidden and latent state. Then 
+        returns the mean observation as the decoder should be greedy.
+
+        Args:
+            hidden_state (torch.Tensor): Hidden state of the agent.
+            latent_state (torch.Tensor): Latent state of the agent.
+        
+        Returns:
+            observation (torch.Tensor): Mean observation in the reconstruction distribution.
+        """
+        # return only the mean observation obtained from forward method to
+        # keep decoder deterministic and greedy (as it doesnt need to explore)
+        observation = self.forward(hidden_state, latent_state)
+        return observation
