@@ -222,7 +222,7 @@ class Agent(nn.Module): # batched sequence (batch_size, sequence_length, feature
                 reward_batch_seq,
                 continue_batch_seq,
                 continue_batch_seq.shape[1]
-            )
+        )
 
         # Compute baseline value with critic (expected return from state)
         value_batched_seq = self.critic.value(h_batch_seq.detach(), z_batch_seq.detach())
