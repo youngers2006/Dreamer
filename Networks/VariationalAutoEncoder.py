@@ -30,9 +30,9 @@ class Encoder(nn.Module):
         ValueError: Raised if observation is too small for 4 layers of down sampling.
     """
     def __init__(
-            self, observation_dims, hidden_state_dim,
-            latent_num_rows, latent_num_columns, num_filters_1,
-            num_filters_2, hidden_layer_nodes, device='cpu'
+            self, observation_dims: int, hidden_state_dim: int,
+            latent_num_rows: int, latent_num_columns: int, num_filters_1: int,
+            num_filters_2: int, hidden_layer_nodes: int, device='cpu'
         ):
         super().__init__()
         self.latent_size = latent_num_rows * latent_num_columns
@@ -102,7 +102,8 @@ class Encoder(nn.Module):
         logits = self.latent_mapper(input_vec)
         return logits
 
-    def encode(self, hidden_state, observation):
+    def encode(
+            self, hidden_state: torch.Tensor, observation: torch.Tensor):
         """Encode method for the encoder.
         
         Runs CNN to predict latent state prediction logits from the observation
@@ -169,9 +170,9 @@ class Decoder(nn.Module):
         device (str): Storage location of the network ('cpu' or 'cuda').
     """
     def __init__(
-            self, latent_num_rows, latent_num_columns, observation_dim,
-            hidden_state_dim, num_filters_1, num_filters_2,
-            hidden_layer_nodes, device='cpu'
+            self, latent_num_rows: int, latent_num_columns: int, observation_dim: int,
+            hidden_state_dim: int, num_filters_1: int, num_filters_2: int,
+            hidden_layer_nodes: int, device='cpu'
         ):
         super().__init__()
 
