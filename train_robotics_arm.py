@@ -32,11 +32,11 @@ def main(config):
     # Setup training and evaluation environments
     env_id = config['env_id']
 
-    base_env = gym.make(env_id, render_mode='rgb_array')
+    base_env = gym.make(env_id)
     pixel_env = AddRenderObservation(base_env, render_only=True)
     env = ResizeObservation(pixel_env, tuple(config['observation_dims']))
 
-    base_env = gym.make(env_id, render_mode='rgb_array')
+    base_env = gym.make(env_id)
     pixel_env = AddRenderObservation(base_env, render_only=True)
     evaluation_env = ResizeObservation(pixel_env, tuple(config['observation_dims']))
 
